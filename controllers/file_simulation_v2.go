@@ -81,7 +81,7 @@ button{background:#0868b5;color:white}.button{background:#eef2f7;color:#23354a}
 	page.WriteString(rid)
 	page.WriteString(`"><button type="submit">Dosyayı indir</button></form>`)
 	if c.PreviewMode == "error" {
-		page.WriteString(`<a class="button" href="/file-preview?rid=`)
+		page.WriteString(`<a class="button" href="/dev-file-landing?preview=1&amp;rid=`)
 		page.WriteString(url.QueryEscape(rs.RId))
 		page.WriteString(`&amp;retry=1">Yenile</a>`)
 	}
