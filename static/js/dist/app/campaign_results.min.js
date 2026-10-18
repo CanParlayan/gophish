@@ -116,37 +116,62 @@ var statusMapping = {
     "Email Reported": "reported",
 }
 
-// File Download Simulation uses distinct-responding recipients for its donut.
-// HTTP response served is not proof the file was saved or opened.
-// No local document-open tracking is implemented.
+// File Simulation only: restore a compact seven-gauge report without modifying
+// Standard Campaign charts or claiming that a local file was opened.
 function prepareScenarioCharts(c) {
-    var downloading = c.scenario_type === "file_download";
-    $("#submitted_data_chart, #chart_left_spacer, #chart_right_spacer").toggle(!downloading);
-    $("#file_downloaded_chart").toggle(downloading);
-}
-
-function fileDownloadMetric(count, total, label) {
-    var percent = total > 0 ? Math.max(0, Math.min(100, Math.floor(count * 100 / total))) : 0;
-    return [{name: label, y: percent, count: count}, {name: "", y: 100 - percent}];
+    var fileMode = c.scenario_type === "file_download";
+    $("#standard_campaign_donuts").toggle(!fileMode);
+    $("#file_campaign_gauges").toggle(fileMode);
 }
 
 function renderFileDownloadMetrics(c) {
     if (c.scenario_type !== "file_download") return;
-    var total = (c.results || []).length;
-    var served = Number(c.unique_download_recipients) || 0;
-    var data = fileDownloadMetric(served, total, "HTTP File Served");
-    var existing = $("#file_downloaded_chart").highcharts();
-    if (existing) {
-        existing.series[0].update({data: data});
-    } else {
-        renderPieChart({
-            elemId: "file_downloaded_chart",
-            title: "HTTP File Served",
-            name: "HTTP File Served",
-            data: data,
-            colors: ["#16a085", "#dddddd"]
-        });
-    }
+
+    // Count unique campaign recipients rather than repeated requests.
+    var eventsByEmail = Object.create(null);
+    $.each(c.timeline || [], function (_, event) {
+        var email = String(event.email || "").trim().toLowerCase();
+        if (!email) return;
+        if (!eventsByEmail[email]) eventsByEmail[email] = Object.create(null);
+        eventsByEmail[email][event.message] = true;
+    });
+
+    var totals = {sent:0, idle:0, opened:0, clicked:0, served:0, reported:0};
+    var recipients = c.results || [];
+    $.each(recipients, function (_, recipient) {
+        var email = String(recipient.email || "").trim().toLowerCase();
+        var events = eventsByEmail[email] || {};
+        var status = recipient.status || "";
+        var clicked = !!events["Clicked Link"] || status === "Clicked Link" || status === "Submitted Data";
+        var opened = !!events["Email Opened"] || status === "Email Opened" || clicked;
+        var served = !!events["File Download Served"];
+        var reported = !!events["Email Reported"] || !!recipient.reported;
+        var sent = !!events["Email Sent"] || !!events["Emails Sent"] ||
+            status === "Email Sent" || opened || clicked || served || reported;
+
+        if (sent) totals.sent++;
+        if (sent && !opened && !clicked && !served && !reported) totals.idle++;
+        if (opened) totals.opened++;
+        if (clicked) totals.clicked++;
+        if (served) totals.served++;
+        if (reported) totals.reported++;
+    });
+
+    var denominator = recipients.length;
+    $.each(["sent","idle","opened","clicked","served","reported"], function (_, key) {
+        var n = totals[key];
+        var pct = denominator > 0 ? Math.min(100, Math.round(100*n/denominator)) : 0;
+        var gauge = $('#file_campaign_gauges [data-metric="' + key + '"]');
+        gauge.find(".file-sim-percent").text("%" + pct);
+        gauge.find(".file-sim-count").text(n + " kişi");
+        gauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321*pct/100).toFixed(1) + " 321");
+    });
+    // A downloaded PDF/DOCX/XLSX/HTML file opened on a local machine is not
+    // observable through GoPhish HTTP logs. Display unknown, not zero.
+    var unknown = $('#file_campaign_gauges [data-metric="file_opened"]');
+    unknown.find(".file-sim-percent").text("—");
+    unknown.find(".file-sim-count").text("Ölçülemiyor");
+    unknown.find(".file-sim-ring-value").attr("stroke-dasharray", "0 321");
 }
 
 // This is an underwhelming attempt at an enum
