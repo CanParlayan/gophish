@@ -47,7 +47,7 @@ function launch() {
                     scenario_type: $("#scenario_type").val() || "standard",
                     file_type: "", // Server derives the safe format from file_name.
                     file_name: $("#scenario_file_name").val().trim(),
-                    preview_mode: $("#scenario_preview_mode").val() || "standard",
+                    preview_mode: "standard",
                     template: {
                         name: $("#template").select2("data")[0].text
                     },
@@ -128,7 +128,6 @@ function dismiss() {
     $("#name").val("");
     $("#scenario_type").val("standard");
     $("#scenario_file_name").val("");
-    $("#scenario_preview_mode").val("standard");
     updateScenarioInputs();
     $("#template").val("").change();
     $("#page").val("").change();
@@ -271,7 +270,6 @@ function copy(idx) {
             $("#name").val("Copy of " + campaign.name)
             $("#scenario_type").val(campaign.scenario_type || "standard");
              $("#scenario_file_name").val(campaign.file_name || (campaign.file_type ? "awareness-simulation." + campaign.file_type : ""));
-            $("#scenario_preview_mode").val(campaign.preview_mode || "standard");
             updateScenarioInputs();
             if (!campaign.template.id) {
                 $("#template").val("").change();
