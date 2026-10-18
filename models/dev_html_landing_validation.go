@@ -97,8 +97,18 @@ func validateDevHTMLLanding(pageHTML string) error {
 	}
 	check(doc, false)
 
-	if !found {
-		return errors.New("HTML Landing Page: Indir veya Download kontrolu bulunamadi")
+	// Runtime binds download-intent forms and legacy <a id="download">.
+	// Reject pages which only contain a visually labelled but unbindable
+	// control; otherwise campaign creation succeeds but landing returns 422.
+	legacyAnchor := false
+	walk(doc, func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" &&
+			attr(n, "id") == "download" && attr(n, "href") != "" {
+			legacyAnchor = true
+		}
+	})
+	if !found || (!forms["download-intent"] && !legacyAnchor) {
+		return errors.New("File Landing Page: indir butonu download-intent formuna bagli olmali veya <a id=download> kullanilmali")
 	}
 	return nil
 }
