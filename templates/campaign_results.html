@@ -1,4 +1,22 @@
 {{define "body"}}
+<style>
+/* File-download-only dashboard; does not apply to Standard Campaign. */
+.file-sim-metrics {padding:20px 0 12px}
+.file-sim-gauges {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:16px;text-align:center}
+.file-sim-gauge {min-width:0;color:#273447}
+.file-sim-ring {position:relative;width:100%;max-width:145px;aspect-ratio:1;margin:0 auto 8px}
+.file-sim-ring svg {width:100%;height:100%;transform:rotate(-90deg)}
+.file-sim-ring-track,.file-sim-ring-value {fill:none;stroke-width:6}
+.file-sim-ring-track {stroke:#e3e7ed}
+.file-sim-ring-value {stroke:var(--gauge-color);stroke-linecap:round;transition:stroke-dasharray .25s}
+.file-sim-percent {position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:600;color:var(--gauge-color)}
+.file-sim-count,.file-sim-label {display:block;font-size:15px;line-height:1.4}
+.file-sim-label {font-weight:600}
+.file-sim-note {color:#667383;font-size:12px;margin:20px 0 0}
+@media(max-width:1100px){.file-sim-gauges{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:22px}}
+@media(max-width:560px){.file-sim-gauges{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
     <div id="loading">
         <i class="fa fa-spinner fa-spin fa-4x"></i>
@@ -48,15 +66,97 @@
                         <div id="timeline_chart"></div>
                     </div>
                 </div>
-                <div class="row">
+                <div class="row" id="standard_campaign_donuts">
                     <div style="height:200px;" class="col-lg-1 col-md-1" id="chart_left_spacer"></div>
                     <div id="sent_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="opened_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="clicked_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div id="file_downloaded_chart" style="height:200px;display:none;" class="col-lg-2 col-md-2"></div>
                     <div id="submitted_data_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="reported_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div style="height:200px;" class="col-lg-1 col-md-1" id="chart_right_spacer"></div>
+                </div>
+                <!-- File-download-only metrics. The standard campaign charts above are unchanged. -->
+                <div id="file_campaign_gauges" class="file-sim-metrics" style="display:none">
+                    <div class="file-sim-gauges">
+                        <div class="file-sim-gauge" data-metric="sent" style="--gauge-color:#f9be2c">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Gönderildi</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="idle" style="--gauge-color:#9acafd">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Etkileşim yok</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="opened" style="--gauge-color:#9161f7">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Açıldı (e-posta)</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="clicked" style="--gauge-color:#ef5f8a">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Tıklandı</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="served" style="--gauge-color:#f26484">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">İndirildi</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="file_opened" style="--gauge-color:#8bd6b0">
+                            <div class="file-sim-ring" title="Dosyanın bilgisayarda açıldığı güvenilir biçimde ölçülemiyor.">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Dosya açıldı</span>
+                        </div>
+                        <div class="file-sim-gauge" data-metric="reported" style="--gauge-color:#7fdbc0">
+                            <div class="file-sim-ring" title="Alıcı başına HTTP olayları">
+                                <svg viewBox="0 0 120 120" aria-hidden="true">
+                                    <circle class="file-sim-ring-track" cx="60" cy="60" r="51"></circle>
+                                    <circle class="file-sim-ring-value" cx="60" cy="60" r="51" stroke-dasharray="0 321"></circle>
+                                </svg>
+                                <span class="file-sim-percent">—</span>
+                            </div>
+                            <span class="file-sim-count">—</span>
+                            <span class="file-sim-label">Raporlandı</span>
+                        </div>
+                    </div>
+                    <p class="file-sim-note">İndirildi: Dosyanın sunucu tarafından gönderildiği HTTP isteği. Dosyanın kaydedilmesi veya bilgisayarda açılması doğrulanamaz. E-posta açılma sayısı da posta istemcisine bağlıdır.</p>
                 </div>
                 <div class="row" id="resultsMapContainer">
                     <div class="col-md-6">
