@@ -163,7 +163,11 @@ func (c *Campaign) Validate() error {
 	if c.ScenarioType == "file_download" {
 		// The filename is the source of truth for new campaigns. Older
 		// clients may still submit file_type without a filename.
-		c.FileName = strings.TrimSpace(c.FileName)
+		// Reject control characters and surrounding whitespace instead of silently
+		// changing the requested download filename.
+		if c.FileName != strings.TrimSpace(c.FileName) {
+			return errors.New("invalid file_name: leading/trailing whitespace is not allowed")
+		}
 		if c.FileName != "" {
 			dot := strings.LastIndexByte(c.FileName, '.')
 			if dot == -1 {
