@@ -18,6 +18,11 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 		http.NotFound(w, r)
 		return
 	}
+	// Reuse the already proxied /dev-file-landing route; no Apache change.
+	if r.URL.Query().Get("preview") == "1" {
+		ps.FilePreviewHandler(w, r)
+		return
+	}
 	// GoPhish's original handler counts Clicked Link and renders the selected
 	// landing page. Don't double-record clicks on subsequent file downloads.
 	recorder := httptest.NewRecorder()
@@ -44,14 +49,15 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	// field: query strings in a GET form action may be discarded by browsers.
 	target := "/download-report"
 	if c.PreviewMode == "error" || c.PreviewMode == "download_preview" {
-		target = "/file-preview"
+		target = "/dev-file-landing"
 	}
 	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
 	if position := formRE.FindIndex(body); position != nil {
 		newForm := []byte(`<form id="download-intent" action="` +
 			html.EscapeString(target) + `" method="GET">` +
 			`<input type="hidden" name="rid" value="` +
-			html.EscapeString(rs.RId) + `">`)
+			html.EscapeString(rs.RId) + `">` +
+			previewInput(target))
 		updated := make([]byte, 0, len(body)+len(newForm))
 		updated = append(updated, body[:position[0]]...)
 		updated = append(updated, newForm...)
@@ -67,7 +73,11 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 			return
 		}
 		anchor := string(body[position[0]:position[1]])
-		href := `href="` + html.EscapeString(target+"?rid="+url.QueryEscape(rs.RId)) + `"`
+		hrefTarget := target+"?rid="+url.QueryEscape(rs.RId)
+		if target == "/dev-file-landing" {
+			hrefTarget += "&preview=1"
+		}
+		href := `href="` + html.EscapeString(hrefTarget) + `"`
 		if hrefRE.MatchString(anchor) {
 			anchor = hrefRE.ReplaceAllString(anchor, href)
 		} else {
@@ -109,4 +119,13 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
+}
+
+// previewInput is only added to preview-mode GET forms, so their click
+// stays on the already-proxied /dev-file-landing endpoint.
+func previewInput(target string) string {
+	if target == "/dev-file-landing" {
+		return `<input type="hidden" name="preview" value="1">`
+	}
+	return ""
 }
