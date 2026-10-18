@@ -121,7 +121,6 @@ func (ps *PhishingServer) registerRoutes() {
 	router.HandleFunc("/dev-file-landing", ps.DevFileLandingHandler).Methods("GET")
 	router.HandleFunc("/dev-track", ps.TrackHandler).Methods("GET")
 	router.HandleFunc("/download-report", ps.DownloadReportHandler).Methods("GET")
-	router.HandleFunc("/file-open-signal", ps.FileOpenSignalHandler).Methods("GET")
 	router.HandleFunc("/{path:.*}", ps.PhishHandler)
 
 	// Setup GZIP compression
