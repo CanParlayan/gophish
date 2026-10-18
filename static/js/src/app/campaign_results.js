@@ -43,6 +43,13 @@ var statuses = {
         point: "ct-point-clicked"
     },
     //not a status, but is used for the campaign timeline and user timeline
+    "File Open Signal": { color: "#287ca8", label: "label-info", icon: "fa-file-text-o", point: "ct-point-clicked" },
+    "File Download Served": {
+        color: "#16a085",
+        label: "label-info",
+        icon: "fa-download",
+        point: "ct-point-clicked"
+    },
     "Email Reported": {
         color: "#45d6ef",
         label: "label-info",
@@ -105,6 +112,54 @@ var statusMapping = {
     "Email Reported": "reported",
 }
 
+// File Download Simulation uses distinct-responding recipients for its donut.
+// HTTP response served is not proof the file was saved, and file-open tracking
+// is not implemented. An unknown open count is N/A, not zero.
+function prepareScenarioCharts(c) {
+    var downloading = c.scenario_type === "file_download";
+    $("#submitted_data_chart, #chart_left_spacer, #chart_right_spacer").toggle(!downloading);
+    $("#file_downloaded_chart, #file_opened_chart").toggle(downloading);
+}
+
+function fileDownloadMetric(count, total, label) {
+    var percent = total > 0 ? Math.max(0, Math.min(100, Math.floor(count * 100 / total))) : 0;
+    return [{name: label, y: percent, count: count}, {name: "", y: 100 - percent}];
+}
+
+function uniqueDevReportSignals(c) {
+    var seen = {};
+    $.each(c.timeline || [], function(_, ev) {
+        if (ev.message === "File Open Signal" && ev.email) seen[ev.email.toLowerCase()] = true;
+    });
+    return Object.keys(seen).length;
+}
+
+function renderFileDownloadMetrics(c) {
+    if (c.scenario_type !== "file_download") return;
+    var total = (c.results || []).length;
+    var served = Number(c.unique_download_recipients) || 0;
+    var downloadData = fileDownloadMetric(served, total, "File Downloaded");
+    var openedData = fileDownloadMetric(uniqueDevReportSignals(c), total, "File Open Signal");
+    var specs = [
+        {id: "file_downloaded_chart", label: "File Downloaded", data: downloadData, color: "#16a085"},
+        {id: "file_opened_chart", label: "Open Signal", data: openedData, color: "#95a5a6"}
+    ];
+    $.each(specs, function (index, metric) {
+        var existing = $("#" + metric.id).highcharts();
+        if (existing) {
+            existing.series[0].update({data: metric.data});
+        } else {
+            renderPieChart({
+                elemId: metric.id,
+                title: metric.label,
+                name: metric.label,
+                data: metric.data,
+                colors: [metric.color, "#dddddd"]
+            });
+        }
+    });
+}
+
 // This is an underwhelming attempt at an enum
 // until I have time to refactor this appropriately.
 var progressListing = [
@@ -115,6 +170,19 @@ var progressListing = [
 ]
 
 var campaign = {}
+function updateScenarioSummary(data) {
+    var labels = {
+        standard: "Standard Campaign",
+        form_submission: "Form Submission Simulation",
+        file_download: "File Download Simulation"
+    };
+    var kind = data.scenario_type || "standard";
+    var summary = "Scenario: " + (labels[kind] || "Standard Campaign");
+    if (kind === "file_download" && data.file_type) {
+        summary += " | File Type: " + data.file_type.toUpperCase();
+    }
+    $("#scenario_summary").text(summary);
+}
 var bubbles = []
 
 function dismiss() {
@@ -537,7 +605,7 @@ var renderPieChart = function (chartopts) {
                 },
                 render: function () {
                     this.innerText.attr({
-                        text: chartopts['data'][0].count
+                        text: (this.series[0].data[0] && this.series[0].data[0].options.count !== undefined) ? this.series[0].data[0].options.count : 0
                     })
                 }
             }
@@ -611,7 +679,41 @@ var updateMap = function (results) {
  * @param {string} status 
  * @param {moment(datetime)} send_date 
  */
-function createStatusLabel(status, send_date) {
+/* DEV_RECIPIENT_FILE_BADGES_V1 */
+// The original GoPhish result.status remains the email status.
+// File badges come from campaign timeline events, keyed by the recipient RID.
+var devFileEventsByRid = Object.create(null);
+function buildDevFileEventsByRid(c) {
+    var byEmail = Object.create(null);
+    var events = Object.create(null);
+    $.each(c.results || [], function(_, result) {
+        var email = String(result.email || '').trim().toLowerCase();
+        if (!email) return;
+        if (!byEmail[email]) byEmail[email] = [];
+        byEmail[email].push(result.id);
+        events[result.id] = {served: false, signal: false};
+    });
+    $.each(c.timeline || [], function(_, ev) {
+        if (ev.message !== 'File Download Served' && ev.message !== 'File Open Signal') return;
+        var email = String(ev.email || '').trim().toLowerCase();
+        var ids = byEmail[email] || [];
+        $.each(ids, function(_, rid) {
+            if (ev.message === 'File Download Served') events[rid].served = true;
+            if (ev.message === 'File Open Signal') events[rid].signal = true;
+        });
+    });
+    devFileEventsByRid = events;
+}
+function devFileStatusBadges(rid) {
+    var event = devFileEventsByRid[rid];
+    if (!event || (!event.served && !event.signal)) return '';
+    var badges = '';
+    if (event.served) badges += '<span class="label label-success" title="HTTP response served, not confirmed saved to disk">File Served</span> ';
+    if (event.signal) badges += '<span class="label label-info" title="Remote image request, not proof that a person opened the file">Open Signal</span>';
+    return '<div style="margin-top:6px;line-height:1.7">' + badges + '</div>';
+}
+
+function createStatusLabel(status, send_date, rid) {
     var label = statuses[status].label || "label-default";
     var statusColumn = "<span class=\"label " + label + "\">" + status + "</span>"
     // Add the tooltip if the email is scheduled to be sent
@@ -619,7 +721,7 @@ function createStatusLabel(status, send_date) {
         var sendDateMessage = "Scheduled to send at " + send_date
         statusColumn = "<span class=\"label " + label + "\" data-toggle=\"tooltip\" data-placement=\"top\" data-html=\"true\" title=\"" + sendDateMessage + "\">" + status + "</span>"
     }
-    return statusColumn
+    return statusColumn + devFileStatusBadges(rid)
 }
 
 /* poll - Queries the API and updates the UI with the results
@@ -630,10 +732,25 @@ function createStatusLabel(status, send_date) {
  * * Map Bubbles
  * * Datatables
  */
+function updateDownloadSummary(c) {
+    var el = $("#download_summary")
+    if (!el.length) return
+    if (c.scenario_type !== "file_download") { el.hide(); return }
+    el.show()
+    el.text("File Download Simulation (" + (c.file_type || "unknown") + ") — " +
+        (c.download_served_count || 0) + " HTTP file responses served; " +
+        (c.unique_download_recipients || 0) + " unique responding recipients. " +
+        "File Downloaded chart = server responses per recipient (not confirmed disk saves). " +
+        "File Open Signal = " + uniqueDevReportSignals(c) + " unique recipients (image request; not proof of execution).")
+}
+
 function poll() {
     api.campaignId.results(campaign.id)
         .success(function (c) {
             campaign = c
+            buildDevFileEventsByRid(c)
+            updateDownloadSummary(c)
+            updateScenarioSummary(c)
             /* Update the timeline */
             var timeline_series_data = []
             $.each(campaign.timeline, function (i, event) {
@@ -689,6 +806,7 @@ function poll() {
                 })
             })
 
+            renderFileDownloadMetrics(c)
             /* Update the datatable */
             resultsTable = $("#resultsTable").DataTable()
             resultsTable.rows().every(function (i, tableLoop, rowLoop) {
@@ -725,10 +843,14 @@ function load() {
     api.campaignId.results(campaign.id)
         .success(function (c) {
             campaign = c
+            buildDevFileEventsByRid(c)
+            updateDownloadSummary(c)
+            updateScenarioSummary(c)
             if (campaign) {
                 $("title").text(c.name + " - Gophish")
                 $("#loading").hide()
                 $("#campaignResults").show()
+                prepareScenarioCharts(c)
                 // Set the title
                 $("#page-title").text("Results for " + c.name)
                 if (c.status == "Completed") {
@@ -768,7 +890,7 @@ function load() {
                         },
                         {
                             "render": function (data, type, row) {
-                                return createStatusLabel(data, row[8])
+                                return createStatusLabel(data, row[8], row[0])
                             },
                             "targets": [6]
                         },
@@ -877,6 +999,8 @@ function load() {
                         colors: [statuses[status].color, '#dddddd']
                     })
                 })
+
+                renderFileDownloadMetrics(c)
 
                 if (use_map) {
                     $("#resultsMapContainer").show()

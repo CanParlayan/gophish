@@ -1,0 +1,93 @@
+package controllers
+
+// DEV_SERVER_SIDE_HTML_JOURNEY_V1
+// Reuse the selected GoPhish landing page and Clicked Link handler; append an
+// explicit HTML download control WITHOUT editing saved landing-page templates.
+import (
+	"bytes"
+	"html"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"regexp"
+	"strings"
+)
+
+func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.Request) {
+	rs, _, ok := devReportRecipient(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	// GoPhish's original handler counts Clicked Link and renders the selected
+	// landing page. Don't double-record clicks on subsequent file downloads.
+	recorder := httptest.NewRecorder()
+	ps.PhishHandler(recorder, r)
+	response := recorder.Result()
+	defer response.Body.Close()
+	for key, values := range response.Header {
+		for _, value := range values {
+			w.Header().Add(key, value)
+		}
+	}
+	if response.StatusCode != http.StatusOK || !strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/html") {
+		w.WriteHeader(response.StatusCode)
+		_, _ = io.Copy(w, response.Body)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	if err != nil {
+		http.Error(w, "Unable to render landing page", http.StatusInternalServerError)
+		return
+	}
+
+	// Use the landing page's existing download buttons.
+	// Never inject an additional visible download link.
+	download := "/download-report?rid=" + url.QueryEscape(rs.RId)
+
+	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
+	position := formRE.FindIndex(body)
+
+	if position == nil {
+		http.Error(w, "Landing Page: download-intent form not found", http.StatusUnprocessableEntity)
+		return
+	}
+
+	newForm := []byte(`<form id="download-intent" action="` +
+		html.EscapeString(download) + `" method="GET">`)
+
+	updated := make([]byte, 0, len(body)+len(newForm))
+	updated = append(updated, body[:position[0]]...)
+	updated = append(updated, newForm...)
+	body = append(updated, body[position[1]:]...)
+
+	// Remove the obsolete event field.
+	intentRE := regexp.MustCompile(`(?is)<input\b[^>]*\bname\s*=\s*["']simulation_event["'][^>]*>`)
+	body = intentRE.ReplaceAll(body, nil)
+
+	// Remove legacy injected anchors if they are already saved in HTML.
+	extraLinkRE := regexp.MustCompile(`(?is)<p\s+style="text-align:center">\s*<a\s+id="download"[^>]*>HTML Raporunu İndir</a>\s*</p>`)
+	body = extraLinkRE.ReplaceAll(body, nil)
+
+	// The supplied landing page contains legacy JS which changes the link
+	// back to tracker.sympanion.com/download/<rid>. Remove ONLY scripts
+	// containing this obsolete endpoint. The correct href is in HTML.
+	legacyScriptRE := regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script\s*>`)
+	body = legacyScriptRE.ReplaceAllFunc(body, func(script []byte) []byte {
+		if bytes.Contains(script, []byte("tracker.sympanion.com/download/")) {
+			return nil
+		}
+		return script
+	})
+	body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("HTML biçimindeki raporunuzu"))
+	body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("HTML Raporunu İndir"))
+	w.Header().Del("Content-Length")
+	w.Header().Del("Content-Encoding")
+	w.Header().Del("ETag")
+	w.Header().Set("Cache-Control", "no-store, max-age=0")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}

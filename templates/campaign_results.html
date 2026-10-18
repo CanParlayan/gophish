@@ -6,6 +6,7 @@
     <div style="display:none;" id="campaignResults">
         <div class="row">
             <h1 class="page-header" id="page-title">Results for campaign.name</h1>
+            <p id="scenario_summary" class="text-muted"></p>
         </div>
         <div class="row">
             <a href="/campaigns" class="btn btn-default">
@@ -48,13 +49,15 @@
                     </div>
                 </div>
                 <div class="row">
-                    <div style="height:200px;" class="col-lg-1 col-md-1"></div>
+                    <div style="height:200px;" class="col-lg-1 col-md-1" id="chart_left_spacer"></div>
                     <div id="sent_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="opened_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="clicked_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
+                    <div id="file_downloaded_chart" style="height:200px;display:none;" class="col-lg-2 col-md-2"></div>
+                    <div id="file_opened_chart" style="height:200px;display:none;" class="col-lg-2 col-md-2"></div>
                     <div id="submitted_data_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
                     <div id="reported_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div style="height:200px;" class="col-lg-1 col-md-1"></div>
+                    <div style="height:200px;" class="col-lg-1 col-md-1" id="chart_right_spacer"></div>
                 </div>
                 <div class="row" id="resultsMapContainer">
                     <div class="col-md-6">
@@ -64,6 +67,7 @@
                 </div>
             </div>
         </div>
+        <div class="alert alert-info" id="download_summary" style="display:none" role="status"></div>
         <div class="row">
             <h2>Details</h2>
             <table id="resultsTable" class="table">

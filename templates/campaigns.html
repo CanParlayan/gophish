@@ -87,6 +87,22 @@
                 <div class="form-group">
                     <label for="name">Name:</label>
                     <input type="text" class="form-control" id="name" placeholder="Campaign name" autofocus>
+                    <label class="control-label" for="scenario_type">Scenario Type:</label>
+                    <select class="form-control" id="scenario_type">
+                        <option value="standard">Standard Campaign</option>
+
+                        <option value="file_download">File Download Simulation</option>
+                    </select>
+                    <div id="scenario_file_options" style="display:none;">
+                        <label class="control-label" for="scenario_file_type">File Type:</label>
+                        <select class="form-control" id="scenario_file_type">
+                            <option value="xlsx">Excel (.xlsx)</option>
+<option value="html">HTML Rapor Önizlemesi (.html) — açılma sinyali</option>
+                            <option value="pdf">PDF (.pdf)</option>
+                            <option value="docx">Word (.docx)</option>
+                                                    </select>
+                        <p class="help-block">This simulation serves a harmless sample file and records HTTP file responses. It cannot verify that a file was saved or opened.</p>
+                    </div>
                     <label class="control-label" for="template">Email Template:</label>
                     <select class="form-control" placeholder="Template Name" id="template" />
                     <option></option>

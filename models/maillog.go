@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"math"
 	"math/big"
 	"net/mail"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -242,12 +244,34 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 		if err != nil {
 			log.Warn(err)
 		}
+		if c.ScenarioType == "file_download" {
+			if c.FileType != "html" {
+				text = autoDownloadSimulationLink(text, ptx.BaseURL, ptx.RId, false)
+			}
+			if c.FileType == "html" {
+				text = strings.ReplaceAll(text, "/download-simulation?rid=", "/download-report?rid=")
+			}
+		}
+		if c.ScenarioType == "file_download" && c.FileType == "html" {
+			text = devPrepareTextCampaignMail(text, ptx.URL, ptx.BaseURL, ptx.RId)
+		}
 		msg.SetBody("text/plain", text)
 	}
 	if c.Template.HTML != "" {
 		html, err := ExecuteTemplate(c.Template.HTML, ptx)
 		if err != nil {
 			log.Warn(err)
+		}
+		if c.ScenarioType == "file_download" {
+			if c.FileType != "html" {
+				html = autoDownloadSimulationLink(html, ptx.BaseURL, ptx.RId, true)
+			}
+			if c.FileType == "html" {
+				html = strings.ReplaceAll(html, "/download-simulation?rid=", "/download-report?rid=")
+			}
+		}
+		if c.ScenarioType == "file_download" && c.FileType == "html" {
+			html = devPrepareHTMLCampaignMail(html, ptx.URL, ptx.BaseURL, ptx.RId)
 		}
 		if c.Template.Text == "" {
 			msg.SetBody("text/html", html)
@@ -264,6 +288,25 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 }
 
 // GetQueuedMailLogs returns the mail logs that are queued up for the given minute.
+// autoDownloadSimulationLink v1 appends a harmless, recipient-specific file link.
+// This is not an attachment, and does not claim that the file was opened.
+func autoDownloadSimulationLink(body, baseURL, rid string, isHTML bool) string {
+	// Respect already customized download links in the template.
+	if strings.Contains(body, "/download-report?rid=") || strings.Contains(body, "/download-report?rid%3D") || strings.Contains(body, "/download-simulation?rid=") || strings.Contains(body, "/download-simulation?rid%3D") {
+		return body
+	}
+	link := strings.TrimRight(baseURL, "/") + "/download-simulation?rid=" + url.QueryEscape(rid)
+	if !isHTML {
+		return body + "\n\nDownload Simulation File:\n" + link + "\n"
+	}
+	block := `<p><a href="` + html.EscapeString(link) + `">Download Simulation File</a></p>`
+	pos := strings.LastIndex(strings.ToLower(body), "</body>")
+	if pos >= 0 {
+		return body[:pos] + block + body[pos:]
+	}
+	return body + block
+}
+
 func GetQueuedMailLogs(t time.Time) ([]*MailLog, error) {
 	ms := []*MailLog{}
 	err := db.Where("send_date <= ? AND processing = ?", t, false).

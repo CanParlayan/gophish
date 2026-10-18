@@ -16,6 +16,8 @@ type Campaign struct {
 	Id            int64     `json:"id"`
 	UserId        int64     `json:"-"`
 	Name          string    `json:"name" sql:"not null"`
+	ScenarioType  string    `json:"scenario_type"`
+	FileType      string    `json:"file_type"`
 	CreatedDate   time.Time `json:"created_date"`
 	LaunchDate    time.Time `json:"launch_date"`
 	SendByDate    time.Time `json:"send_by_date"`
@@ -35,11 +37,15 @@ type Campaign struct {
 
 // CampaignResults is a struct representing the results from a campaign
 type CampaignResults struct {
-	Id      int64    `json:"id"`
-	Name    string   `json:"name"`
-	Status  string   `json:"status"`
-	Results []Result `json:"results,omitempty"`
-	Events  []Event  `json:"timeline,omitempty"`
+	DownloadServedCount      int64    `json:"download_served_count"`
+	UniqueDownloadRecipients int64    `json:"unique_download_recipients"`
+	Id                       int64    `json:"id"`
+	ScenarioType             string   `json:"scenario_type"`
+	FileType                 string   `json:"file_type"`
+	Name                     string   `json:"name"`
+	Status                   string   `json:"status"`
+	Results                  []Result `json:"results,omitempty"`
+	Events                   []Event  `json:"timeline,omitempty"`
 }
 
 // CampaignSummaries is a struct representing the overview of campaigns
@@ -51,6 +57,8 @@ type CampaignSummaries struct {
 // CampaignSummary is a struct representing the overview of a single camaign
 type CampaignSummary struct {
 	Id            int64         `json:"id"`
+	ScenarioType  string        `json:"scenario_type"`
+	FileType      string        `json:"file_type"`
 	CreatedDate   time.Time     `json:"created_date"`
 	LaunchDate    time.Time     `json:"launch_date"`
 	SendByDate    time.Time     `json:"send_by_date"`
@@ -131,6 +139,25 @@ const RecipientParameter = "rid"
 
 // Validate checks to make sure there are no invalid fields in a submitted campaign
 func (c *Campaign) Validate() error {
+	// Standard remains the default for old GoPhish API clients.
+	if c.ScenarioType == "" {
+		c.ScenarioType = "standard"
+	}
+	switch c.ScenarioType {
+	case "standard", "form_submission", "file_download":
+	default:
+		return errors.New("invalid scenario_type")
+	}
+	if c.ScenarioType == "file_download" {
+		switch c.FileType {
+		case "xlsx", "docx", "pdf", "html", "exe":
+		default:
+			return errors.New("invalid file_type")
+		}
+	} else {
+		// Non-file scenarios must not store stale file selections.
+		c.FileType = ""
+	}
 	switch {
 	case c.Name == "":
 		return ErrCampaignNameNotSpecified
@@ -324,7 +351,7 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 	cs := []CampaignSummary{}
 	// Get the basic campaign information
 	query := db.Table("campaigns").Where("user_id = ?", uid)
-	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
+	query = query.Select("id, name, scenario_type, file_type, created_date, launch_date, send_by_date, completed_date, status")
 	err := query.Scan(&cs).Error
 	if err != nil {
 		log.Error(err)
@@ -347,7 +374,7 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 func GetCampaignSummary(id int64, uid int64) (CampaignSummary, error) {
 	cs := CampaignSummary{}
 	query := db.Table("campaigns").Where("user_id = ? AND id = ?", uid, id)
-	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
+	query = query.Select("id, name, scenario_type, file_type, created_date, launch_date, send_by_date, completed_date, status")
 	err := query.Scan(&cs).Error
 	if err != nil {
 		log.Error(err)
@@ -426,6 +453,18 @@ func GetCampaignResults(id int64, uid int64) (CampaignResults, error) {
 	if err != nil {
 		log.Errorf("%s: events not found for campaign", err)
 		return cr, err
+	}
+	if cr.ScenarioType == "file_download" {
+		err = db.Table("events").Where("campaign_id=? AND message=?", cr.Id, "File Download Served").Count(&cr.DownloadServedCount).Error
+		if err != nil {
+			return cr, err
+		}
+		var distinct []struct{ Email string }
+		err = db.Table("events").Select("DISTINCT email").Where("campaign_id=? AND message=?", cr.Id, "File Download Served").Scan(&distinct).Error
+		if err != nil {
+			return cr, err
+		}
+		cr.UniqueDownloadRecipients = int64(len(distinct))
 	}
 	return cr, err
 }
@@ -510,6 +549,12 @@ func PostCampaign(c *Campaign, uid int64) error {
 	} else if err != nil {
 		log.Error(err)
 		return err
+	}
+	// DEV_HTML_LANDING_GLOBAL_VALIDATION_V5: validate the saved Landing Page.
+	if c.ScenarioType == "file_download" && c.FileType == "html" {
+		if err := validateDevHTMLLanding(p.HTML); err != nil {
+			return err
+		}
 	}
 	c.Page = p
 	c.PageId = p.Id
@@ -609,7 +654,7 @@ func PostCampaign(c *Campaign, uid int64) error {
 	return tx.Commit().Error
 }
 
-//DeleteCampaign deletes the specified campaign
+// DeleteCampaign deletes the specified campaign
 func DeleteCampaign(id int64) error {
 	log.WithFields(logrus.Fields{
 		"campaign_id": id,

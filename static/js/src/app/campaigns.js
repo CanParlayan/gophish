@@ -10,6 +10,10 @@ var labels = {
 
 var campaigns = []
 var campaign = {}
+function updateScenarioInputs() {
+    var isFileDownload = $("#scenario_type").val() === "file_download";
+    $("#scenario_file_options").toggle(isFileDownload);
+}
 
 // Launch attempts to POST to /campaigns/
 function launch() {
@@ -39,6 +43,8 @@ function launch() {
                 }
                 campaign = {
                     name: $("#name").val(),
+                    scenario_type: $("#scenario_type").val() || "standard",
+                    file_type: $("#scenario_type").val() === "file_download" ? $("#scenario_file_type").val() : "",
                     template: {
                         name: $("#template").select2("data")[0].text
                     },
@@ -117,6 +123,9 @@ function sendTestEmail() {
 function dismiss() {
     $("#modal\\.flashes").empty();
     $("#name").val("");
+    $("#scenario_type").val("standard");
+    $("#scenario_file_type").val("xlsx");
+    updateScenarioInputs();
     $("#template").val("").change();
     $("#page").val("").change();
     $("#url").val("");
@@ -256,6 +265,9 @@ function copy(idx) {
     api.campaignId.get(campaigns[idx].id)
         .success(function (campaign) {
             $("#name").val("Copy of " + campaign.name)
+            $("#scenario_type").val(campaign.scenario_type || "standard");
+            $("#scenario_file_type").val(campaign.file_type || "xlsx");
+            updateScenarioInputs();
             if (!campaign.template.id) {
                 $("#template").val("").change();
                 $("#template").select2({
@@ -292,6 +304,8 @@ function copy(idx) {
 }
 
 $(document).ready(function () {
+    $("#scenario_type").on("change", updateScenarioInputs);
+    updateScenarioInputs();
     $("#launch_date").datetimepicker({
         "widgetPositioning": {
             "vertical": "bottom"

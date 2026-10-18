@@ -3,6 +3,7 @@ package models
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net"
 	"time"
@@ -133,6 +134,16 @@ func (r *Result) HandleFormSubmit(details EventDetails) error {
 	r.Status = EventDataSubmit
 	r.ModifiedDate = event.Time
 	return db.Save(r).Error
+}
+
+// HandleFileDownloadServed records that the server delivered a benign test file.
+// It deliberately does not claim that the browser saved or opened the file.
+func (r *Result) HandleFileDownloadServed(fileType string) error {
+	return AddEvent(&Event{
+		Email:   r.Email,
+		Message: "File Download Served",
+		Details: fmt.Sprintf(`{"file_type":%q,"meaning":"server_response"}`, fileType),
+	}, r.CampaignId)
 }
 
 // HandleEmailReport updates a Result in the case where they report a simulated

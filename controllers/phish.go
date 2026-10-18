@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -110,11 +112,16 @@ func (ps *PhishingServer) registerRoutes() {
 	router := mux.NewRouter()
 	fileServer := http.FileServer(unindexed.Dir("./static/endpoint/"))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fileServer))
+	router.HandleFunc("/download-simulation", ps.DownloadSimulationHandler).Methods("GET")
 	router.HandleFunc("/track", ps.TrackHandler)
 	router.HandleFunc("/robots.txt", ps.RobotsHandler)
 	router.HandleFunc("/{path:.*}/track", ps.TrackHandler)
 	router.HandleFunc("/{path:.*}/report", ps.ReportHandler)
 	router.HandleFunc("/report", ps.ReportHandler)
+	router.HandleFunc("/dev-file-landing", ps.DevFileLandingHandler).Methods("GET")
+	router.HandleFunc("/dev-track", ps.TrackHandler).Methods("GET")
+	router.HandleFunc("/download-report", ps.DownloadReportHandler)
+	router.HandleFunc("/file-open-signal", ps.FileOpenSignalHandler)
 	router.HandleFunc("/{path:.*}", ps.PhishHandler)
 
 	// Setup GZIP compression
@@ -128,6 +135,125 @@ func (ps *PhishingServer) registerRoutes() {
 	// Setup logging
 	phishHandler = handlers.CombinedLoggingHandler(log.Writer(), phishHandler)
 	ps.server.Handler = phishHandler
+}
+
+// DownloadSimulationHandler serves harmless, generated training files.
+// A successful response is logged as "File Download Served", not "file opened".
+// Example link: {{.URL}}/download-simulation?rid={{.RId}} (adjust template context).
+func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *http.Request) {
+	rid := r.URL.Query().Get(models.RecipientParameter)
+	if rid == "" || strings.HasSuffix(rid, TransparencySuffix) {
+		http.NotFound(w, r)
+		return
+	}
+	rs, err := models.GetResult(rid)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	c, err := models.GetCampaign(rs.CampaignId, rs.UserId)
+	if err != nil || c.Status == models.CampaignComplete || c.ScenarioType != "file_download" {
+		http.NotFound(w, r)
+		return
+	}
+	var body []byte
+	var mime, name string
+	switch c.FileType {
+	case "pdf":
+		// Valid single-page PDF, with a fixed and clearly labeled simulation message.
+		body = buildAwarenessPDF()
+		mime, name = "application/pdf", "awareness-simulation.pdf"
+	case "xlsx", "docx":
+		// Office files are generated in memory as small valid OOXML ZIP containers.
+		body, err = buildAwarenessOfficeFile(c.FileType)
+		if err != nil {
+			log.Error(err)
+			http.Error(w, "Simulation unavailable", http.StatusInternalServerError)
+			return
+		}
+		if c.FileType == "xlsx" {
+			mime, name = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "awareness-simulation.xlsx"
+		} else {
+			mime, name = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "awareness-simulation.docx"
+		}
+	default:
+		// EXE deliberately not supported: never serve executable payloads.
+		http.Error(w, "File type not supported for safe simulation", http.StatusNotImplemented)
+		return
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	if _, err := w.Write(body); err != nil {
+		log.Warnf("simulation file response error: %v", err)
+		return
+	}
+	if err := rs.HandleFileDownloadServed(c.FileType); err != nil {
+		log.Error(err)
+	}
+}
+
+// buildAwarenessPDF generates a minimal, valid PDF with a real xref table.
+func buildAwarenessPDF() []byte {
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.4\n")
+	offsets := []int{0}
+	writeObj := func(id int, content string) {
+		offsets = append(offsets, b.Len())
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", id, content)
+	}
+	writeObj(1, "<</Type /Catalog /Pages 2 0 R>>")
+	writeObj(2, "<</Type /Pages /Kids [3 0 R] /Count 1>>")
+	writeObj(3, "<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>>")
+	stream := "BT /F1 16 Tf 72 700 Td (Authorized security awareness simulation) Tj ET\n"
+	writeObj(4, fmt.Sprintf("<</Length %d>>\nstream\n%sendstream", len(stream), stream))
+	writeObj(5, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>")
+	start := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(offsets))
+	for _, off := range offsets[1:] {
+		fmt.Fprintf(&b, "%010d 00000 n \n", off)
+	}
+	fmt.Fprintf(&b, "trailer <</Size %d /Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", len(offsets), start)
+	return b.Bytes()
+}
+
+// buildAwarenessOfficeFile creates macro-free, external-link-free training files.
+func buildAwarenessOfficeFile(fileType string) ([]byte, error) {
+	var buffer bytes.Buffer
+	zw := zip.NewWriter(&buffer)
+	var files map[string]string
+	if fileType == "xlsx" {
+		files = map[string]string{
+			"[Content_Types].xml":        `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`,
+			"_rels/.rels":                `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+			"xl/workbook.xml":            `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Awareness" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+			"xl/_rels/workbook.xml.rels": `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+			"xl/worksheets/sheet1.xml":   `<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Authorized security awareness simulation</t></is></c></row></sheetData></worksheet>`,
+		}
+	} else if fileType == "docx" {
+		files = map[string]string{
+			"[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+			"_rels/.rels":         `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+			"word/document.xml":   `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Authorized security awareness simulation</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`,
+		}
+	} else {
+		return nil, fmt.Errorf("unsupported office file type: %s", fileType)
+	}
+	for name, content := range files {
+		f, err := zw.Create(name)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = f.Write([]byte(content)); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
 
 // TrackHandler tracks emails as they are opened, updating the status for the given Result
