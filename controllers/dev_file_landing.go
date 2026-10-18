@@ -48,7 +48,10 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	// Reuse existing controls. GET forms must submit rid as a named
 	// field: query strings in a GET form action may be discarded by browsers.
 	target := "/download-report"
-	if c.PreviewMode == "error" || c.PreviewMode == "download_preview" {
+	// An HTML error simulation belongs inside the downloaded HTML file,
+	// not in a separate web page reached by an "İndir" button.
+	if c.PreviewMode == "download_preview" ||
+		(c.PreviewMode == "error" && c.FileType != "html") {
 		target = "/dev-file-landing"
 	}
 	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
