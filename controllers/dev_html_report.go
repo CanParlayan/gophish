@@ -78,6 +78,25 @@ small{color:#637589}</style></head><body>
 <img src="%s" width="1" height="1" alt="" style="position:absolute;left:-9999px" referrerpolicy="no-referrer">
 </body></html>`, html.EscapeString(rs.FirstName), html.EscapeString(signal))
 
+	// In HTML error mode the simulated failure is the downloaded
+	// document itself. Avoid showing one error page before download and
+	// then a seemingly successful report after the user opens the file.
+	if c.PreviewMode == "error" {
+		body = fmt.Sprintf(`<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapor önizleme sorunu</title><style>
+*{box-sizing:border-box}body{font:16px system-ui,Arial,sans-serif;background:#f4f6f9;color:#243449;margin:0;padding:40px 16px}
+main{max-width:740px;margin:0 auto;background:#fff;border:1px solid #dce3ec;border-radius:12px;padding:36px;box-shadow:0 12px 32px #1322380b}
+h1{font-size:25px;margin:0 0 16px}p{color:#52657b;line-height:1.7}
+small{display:block;color:#7b8797;margin-top:42px}
+</style></head><body><main>
+<h1>Bu dosyayı görüntüleyemiyoruz</h1>
+<p>Rapor önizlemesi oluşturulamadı. Dosyanın içeriği şu anda görüntülenemiyor.</p>
+<small>Güvenlik farkındalık simülasyonu. Bu mesaj gerçek bir dosya arızasını veya bir kişinin dosyayı açtığını kanıtlamaz.</small>
+</main><img src="%s" width="1" height="1" alt="" style="position:absolute;left:-9999px" referrerpolicy="no-referrer">
+</body></html>`, html.EscapeString(signal))
+	}
+
 	w.Header().Set("Cache-Control", "no-store, max-age=0")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
