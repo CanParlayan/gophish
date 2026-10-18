@@ -50,6 +50,8 @@ var statuses = {
         icon: "fa-download",
         point: "ct-point-clicked"
     },
+    "Preview Shown": { color: "#6e63a9", label: "label-info", icon: "fa-eye", point: "ct-point-clicked" },
+    "Retry Clicked": { color: "#a87731", label: "label-warning", icon: "fa-refresh", point: "ct-point-clicked" },
     "Email Reported": {
         color: "#45d6ef",
         label: "label-info",
