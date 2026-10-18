@@ -4,10 +4,10 @@ package controllers
 import (
 	"bytes"
 	"html"
-	"net/url"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -73,7 +73,7 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 			return
 		}
 		anchor := string(body[position[0]:position[1]])
-		hrefTarget := target+"?rid="+url.QueryEscape(rs.RId)
+		hrefTarget := target + "?rid=" + url.QueryEscape(rs.RId)
 		if target == "/dev-file-landing" {
 			hrefTarget += "&preview=1"
 		}
