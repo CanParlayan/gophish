@@ -101,7 +101,16 @@
                             <option value="pdf">PDF (.pdf)</option>
                             <option value="docx">Word (.docx)</option>
                                                     </select>
-                        <p class="help-block">This simulation serves a harmless sample file and records HTTP file responses. It cannot verify that a file was saved or opened.</p>
+                        <label class="control-label" for="scenario_file_name">Download filename (optional):</label>
+                        <input type="text" class="form-control" id="scenario_file_name" maxlength="80" placeholder="awareness-simulation.xlsx" />
+                        <p class="help-block">Use the chosen extension (example: Finansal_Ozet.pdf). The system generates a safe sample; file uploads are not supported.</p>
+                        <label class="control-label" for="scenario_preview_mode">Preview mode:</label>
+                        <select class="form-control" id="scenario_preview_mode">
+                            <option value="standard">Standard Download</option>
+                            <option value="error">Preview Error (simulated)</option>
+                            <option value="download_preview">Download + Preview</option>
+                        </select>
+                        <p class="help-block">Preview events are HTTP interaction signals, not proof that a document was opened. No macros or executables are generated.</p>
                     </div>
                     <label class="control-label" for="template">Email Template:</label>
                     <select class="form-control" placeholder="Template Name" id="template" />
