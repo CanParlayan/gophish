@@ -53,6 +53,33 @@ func TestFileSimulationV2Validation(t *testing.T) {
 	}
 }
 
+func TestFileSimulationFilenameDeterminesType(t *testing.T) {
+	for _, name := range []string{"rapor.html", "rapor.pdf", "rapor.xlsx", "rapor.docx"} {
+		c := validSimulationCampaign()
+		c.FileType = ""
+		c.FileName = name
+		if err := c.Validate(); err != nil {
+			t.Errorf("filename %q rejected: %v", name, err)
+		}
+		if c.FileType != strings.TrimPrefix(name, "rapor.") {
+			t.Errorf("filename %q yielded type %q", name, c.FileType)
+		}
+	}
+	for _, name := range []string{"rapor.exe", "rapor", "../rapor.pdf", "rapor.pdf\r\n"} {
+		c := validSimulationCampaign()
+		c.FileType = ""
+		c.FileName = name
+		if err := c.Validate(); err == nil {
+			t.Errorf("invalid filename accepted: %q", name)
+		}
+	}
+	c := validSimulationCampaign()
+	c.FileType, c.FileName = "html", "rapor.pdf"
+	if err := c.Validate(); err == nil {
+		t.Fatal("conflicting legacy file_type and filename accepted")
+	}
+}
+
 func TestFileSimulationV2NonFileScenarioClearsOptions(t *testing.T) {
 	c := validSimulationCampaign()
 	c.ScenarioType = "standard"
