@@ -33,7 +33,7 @@ func devReportRecipient(r *http.Request) (models.Result, models.Campaign, bool) 
 	if err != nil {
 		return emptyR, emptyC, false
 	}
-	if campaign.ScenarioType != "file_download" || campaign.FileType != "html" || campaign.Status == models.CampaignComplete {
+	if campaign.ScenarioType != "file_download" || campaign.Status == models.CampaignComplete {
 		return emptyR, emptyC, false
 	}
 	return result, campaign, true
@@ -45,6 +45,12 @@ func (ps *PhishingServer) DownloadReportHandler(w http.ResponseWriter, r *http.R
 	rs, c, ok := devReportRecipient(r)
 	if !ok {
 		http.NotFound(w, r)
+		return
+	}
+	if c.FileType != "html" {
+		// All formats share this endpoint. The existing safe PDF/OOXML
+		// generator is reused, and it logs File Download Served.
+		ps.DownloadSimulationHandler(w, r)
 		return
 	}
 	base := strings.TrimRight(c.URL, "/")
@@ -75,7 +81,7 @@ small{color:#637589}</style></head><body>
 	w.Header().Set("Cache-Control", "no-store, max-age=0")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="rapor-onizlemesi.html"`)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, simulationFilename(c)))
 	if _, err := w.Write([]byte(body)); err != nil {
 		return
 	}
@@ -86,8 +92,8 @@ small{color:#637589}</style></head><body>
 // FileOpenSignalHandler serves a transparent 1x1 image. A GET indicates that
 // an image resource was requested; it is NOT proof the file was executed.
 func (ps *PhishingServer) FileOpenSignalHandler(w http.ResponseWriter, r *http.Request) {
-	rs, _, ok := devReportRecipient(r)
-	if !ok {
+	rs, c, ok := devReportRecipient(r)
+	if !ok || c.FileType != "html" {
 		http.NotFound(w, r)
 		return
 	}
