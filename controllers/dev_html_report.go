@@ -1,16 +1,11 @@
 package controllers
 
-// DEV HTML REPORT OPEN SIGNAL v1
-// HTML is explicitly labeled as HTML. The image fetch is only a network
-// signal and must never be reported as guaranteed user open or execution.
+// Safe downloadable HTML awareness report. Only the HTTP file response is recorded.
 import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"net"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/gophish/gophish/models"
 )
@@ -53,14 +48,7 @@ func (ps *PhishingServer) DownloadReportHandler(w http.ResponseWriter, r *http.R
 		ps.DownloadSimulationHandler(w, r)
 		return
 	}
-	base := strings.TrimRight(c.URL, "/")
-	parsed, err := url.Parse(base)
-	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		http.Error(w, "Invalid campaign URL", http.StatusInternalServerError)
-		return
-	}
-	signal := "https://tracker.sympanion.com/file-open-signal?rid=" + url.QueryEscape(rs.RId)
-	// Personalization and telemetry RID are built on the server for each result.
+	// Self-contained HTML: no tracking pixels or remote document resources.
 	body := fmt.Sprintf(`<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rapor Önizlemesi</title><style>
@@ -73,10 +61,9 @@ small{color:#637589}</style></head><body>
 <table><thead><tr><th>Başlık</th><th>Durum</th><th>Açıklama</th></tr></thead><tbody>
 <tr><td>Rapor görünümü</td><td>Hazır</td><td>Örnek tablo</td></tr>
 <tr><td>Dosya biçimi</td><td>HTML</td><td>Excel çalışma kitabı değildir</td></tr>
-<tr><td>Güvenlik simülasyonu</td><td>Etkin</td><td>Belge açıldığında ağ sinyali alınabilir</td></tr>
+<tr><td>Güvenlik simülasyonu</td><td>Etkin</td><td>İndirme yanıtı kaydedilir; dosyanın açılması izlenmez</td></tr>
 </tbody></table><p><small>Bu doküman herhangi bir program çalıştırmaz ve makro içermez.</small></p></main>
-<img src="%s" width="1" height="1" alt="" style="position:absolute;left:-9999px" referrerpolicy="no-referrer">
-</body></html>`, html.EscapeString(rs.FirstName), html.EscapeString(signal))
+</body></html>`, html.EscapeString(rs.FirstName))
 
 	// In HTML error mode the simulated failure is the downloaded
 	// document itself. Avoid showing one error page before download and
@@ -93,8 +80,7 @@ small{display:block;color:#7b8797;margin-top:42px}
 <h1>Bu dosyayı görüntüleyemiyoruz</h1>
 <p>Rapor önizlemesi oluşturulamadı. Dosyanın içeriği şu anda görüntülenemiyor.</p>
 <small>Güvenlik farkındalık simülasyonu. Bu mesaj gerçek bir dosya arızasını veya bir kişinin dosyayı açtığını kanıtlamaz.</small>
-</main><img src="%s" width="1" height="1" alt="" style="position:absolute;left:-9999px" referrerpolicy="no-referrer">
-</body></html>`, html.EscapeString(signal))
+</main></body></html>`)
 	}
 
 	w.Header().Set("Cache-Control", "no-store, max-age=0")
@@ -106,31 +92,4 @@ small{display:block;color:#7b8797;margin-top:42px}
 	}
 	detail, _ := json.Marshal(map[string]string{"format": "html", "action": "http-response-served"})
 	_ = models.AddEvent(&models.Event{Email: rs.Email, Message: "File Download Served", Details: string(detail)}, rs.CampaignId)
-}
-
-// FileOpenSignalHandler serves a transparent 1x1 image. A GET indicates that
-// an image resource was requested; it is NOT proof the file was executed.
-func (ps *PhishingServer) FileOpenSignalHandler(w http.ResponseWriter, r *http.Request) {
-	rs, c, ok := devReportRecipient(r)
-	if !ok || c.FileType != "html" {
-		http.NotFound(w, r)
-		return
-	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
-	details := models.EventDetails{
-		Payload: url.Values{"signal": []string{"remote-image-request"}},
-		Browser: map[string]string{"address": ip, "user-agent": r.UserAgent()},
-	}
-	if err := models.AddUniqueDevFileOpenSignal(rs.CampaignId, rs.Email, details); err != nil {
-		http.Error(w, "Failed to record event", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Type", "image/gif")
-	// Valid single-pixel transparent GIF.
-	w.Write([]byte{0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21, 0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b})
 }
