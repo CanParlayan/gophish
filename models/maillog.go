@@ -245,14 +245,8 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 			log.Warn(err)
 		}
 		if c.ScenarioType == "file_download" {
-			if c.FileType != "html" {
-				text = autoDownloadSimulationLink(text, ptx.BaseURL, ptx.RId, false)
-			}
-			if c.FileType == "html" {
-				text = strings.ReplaceAll(text, "/download-simulation?rid=", "/download-report?rid=")
-			}
-		}
-		if c.ScenarioType == "file_download" && c.FileType == "html" {
+			// All four formats first use the campaign's existing landing page.
+			// Older already-sent emails retain the legacy direct download link.
 			text = devPrepareTextCampaignMail(text, ptx.URL, ptx.BaseURL, ptx.RId)
 		}
 		msg.SetBody("text/plain", text)
@@ -263,14 +257,6 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 			log.Warn(err)
 		}
 		if c.ScenarioType == "file_download" {
-			if c.FileType != "html" {
-				html = autoDownloadSimulationLink(html, ptx.BaseURL, ptx.RId, true)
-			}
-			if c.FileType == "html" {
-				html = strings.ReplaceAll(html, "/download-simulation?rid=", "/download-report?rid=")
-			}
-		}
-		if c.ScenarioType == "file_download" && c.FileType == "html" {
 			html = devPrepareHTMLCampaignMail(html, ptx.URL, ptx.BaseURL, ptx.RId)
 		}
 		if c.Template.Text == "" {
