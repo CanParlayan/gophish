@@ -120,8 +120,8 @@ func (ps *PhishingServer) registerRoutes() {
 	router.HandleFunc("/report", ps.ReportHandler)
 	router.HandleFunc("/dev-file-landing", ps.DevFileLandingHandler).Methods("GET")
 	router.HandleFunc("/dev-track", ps.TrackHandler).Methods("GET")
-	router.HandleFunc("/download-report", ps.DownloadReportHandler)
-	router.HandleFunc("/file-open-signal", ps.FileOpenSignalHandler)
+	router.HandleFunc("/download-report", ps.DownloadReportHandler).Methods("GET")
+	router.HandleFunc("/file-open-signal", ps.FileOpenSignalHandler).Methods("GET")
 	router.HandleFunc("/{path:.*}", ps.PhishHandler)
 
 	// Setup GZIP compression
@@ -162,7 +162,7 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 	case "pdf":
 		// Valid single-page PDF, with a fixed and clearly labeled simulation message.
 		body = buildAwarenessPDF()
-		mime, name = "application/pdf", "awareness-simulation.pdf"
+		mime, name = "application/pdf", simulationFilename(c)
 	case "xlsx", "docx":
 		// Office files are generated in memory as small valid OOXML ZIP containers.
 		body, err = buildAwarenessOfficeFile(c.FileType)
@@ -172,9 +172,9 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 			return
 		}
 		if c.FileType == "xlsx" {
-			mime, name = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "awareness-simulation.xlsx"
+			mime, name = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", simulationFilename(c)
 		} else {
-			mime, name = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "awareness-simulation.docx"
+			mime, name = "application/vnd.openxmlformats-officedocument.wordprocessingml.document", simulationFilename(c)
 		}
 	default:
 		// EXE deliberately not supported: never serve executable payloads.
