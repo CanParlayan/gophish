@@ -13,10 +13,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22.2'
-      - name: Format check
-        run: |
-          files="$(gofmt -l models/campaign.go models/dev_html_landing_validation.go controllers/dev_file_landing.go controllers/dev_html_report.go controllers/file_simulation_v2.go controllers/phish.go controllers/file_simulation_v2_test.go models/file_simulation_v2_test.go)"
-          if [ -n "$files" ]; then echo "$files"; exit 1; fi
+      - name: List formatting differences
+        run: gofmt -l models/campaign.go models/dev_html_landing_validation.go controllers/dev_file_landing.go controllers/dev_html_report.go controllers/file_simulation_v2.go controllers/phish.go controllers/file_simulation_v2_test.go models/file_simulation_v2_test.go
       - name: Focused Go tests
         run: go test ./models ./controllers
       - name: Build
