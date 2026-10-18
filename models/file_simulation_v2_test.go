@@ -64,3 +64,19 @@ func TestFileSimulationV2NonFileScenarioClearsOptions(t *testing.T) {
 		t.Fatal("stale file selection on non-file campaign")
 	}
 }
+
+func TestFileSimulationV2LandingControls(t *testing.T) {
+	validPages := []string{
+		`<html><body><form id="download-intent"></form><button form="download-intent" type="submit">İndir</button></body></html>`,
+		`<html><body><a id="download" href="#">Download</a></body></html>`,
+	}
+	for _, markup := range validPages {
+		if err := validateDevHTMLLanding(markup); err != nil {
+			t.Errorf("supported control rejected: %v", err)
+		}
+	}
+	bad := `<html><body><form id="other"></form><button form="other" type="submit">İndir</button></body></html>`
+	if err := validateDevHTMLLanding(bad); err == nil {
+		t.Fatal("unsupported button would lead to 422 on the landing handler")
+	}
+}
