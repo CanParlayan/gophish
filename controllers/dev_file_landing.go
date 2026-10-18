@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"regexp"
 	"strings"
 )
@@ -44,7 +43,6 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 
 	// Use the landing page's existing download buttons.
 	// Never inject an additional visible download link.
-	download := "/download-report?rid=" + url.QueryEscape(rs.RId)
 
 	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
 	position := formRE.FindIndex(body)
@@ -54,8 +52,9 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	newForm := []byte(`<form id="download-intent" action="` +
-		html.EscapeString(download) + `" method="GET">`)
+	newForm := []byte(`<form id="download-intent" action="/download-report" method="GET">` +
+		`<input type="hidden" name="rid" value="` +
+		html.EscapeString(rs.RId) + `">`)
 
 	updated := make([]byte, 0, len(body)+len(newForm))
 	updated = append(updated, body[:position[0]]...)
