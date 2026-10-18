@@ -94,23 +94,16 @@
                         <option value="file_download">File Download Simulation</option>
                     </select>
                     <div id="scenario_file_options" style="display:none;">
-                        <label class="control-label" for="scenario_file_type">File Type:</label>
-                        <select class="form-control" id="scenario_file_type">
-                            <option value="xlsx">Excel (.xlsx)</option>
-<option value="html">HTML Rapor Önizlemesi (.html) — açılma sinyali</option>
-                            <option value="pdf">PDF (.pdf)</option>
-                            <option value="docx">Word (.docx)</option>
-                                                    </select>
-                        <label class="control-label" for="scenario_file_name">Download filename (optional):</label>
-                        <input type="text" class="form-control" id="scenario_file_name" maxlength="80" placeholder="awareness-simulation.xlsx" />
-                        <p class="help-block">Use the chosen extension (example: Finansal_Ozet.pdf). The system generates a safe sample; file uploads are not supported.</p>
+                        <label class="control-label" for="scenario_file_name">Dosya adı:</label>
+                        <input type="text" class="form-control" id="scenario_file_name" maxlength="80" placeholder="ornek-rapor.pdf" autocomplete="off" />
+                        <p class="help-block">Dosya türü uzantıdan belirlenir: .html, .pdf, .xlsx veya .docx. Örnek bir dosya üretilir; dosya yükleme yoktur.</p>
                         <label class="control-label" for="scenario_preview_mode">Preview mode:</label>
                         <select class="form-control" id="scenario_preview_mode">
                             <option value="standard">Standard Download</option>
                             <option value="error">Preview Error (simulated)</option>
                             <option value="download_preview">Download + Preview</option>
                         </select>
-                        <p class="help-block">Preview events are HTTP interaction signals, not proof that a document was opened. No macros or executables are generated.</p>
+                        <p class="help-block">HTML + Preview Error: İndir düğmesi HTML dosyasını indirir, hata görünümü dosyanın içinde açılır. Diğer biçimlerde Preview Error önce tarayıcı önizlemesi gösterir. Bu olaylar gerçek dosya açılışını doğrulamaz.</p>
                     </div>
                     <label class="control-label" for="template">Email Template:</label>
                     <select class="form-control" placeholder="Template Name" id="template" />
