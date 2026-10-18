@@ -13,7 +13,7 @@ var campaign = {}
 function updateScenarioInputs() {
     var isFileDownload = $("#scenario_type").val() === "file_download";
     $("#scenario_file_options").toggle(isFileDownload);
-    $("#scenario_file_name").attr("placeholder", "awareness-simulation." + ($("#scenario_file_type").val() || "xlsx"));
+    $("#scenario_file_name").attr("placeholder", "ornek-rapor.pdf");
 }
 
 // Launch attempts to POST to /campaigns/
@@ -45,7 +45,7 @@ function launch() {
                 campaign = {
                     name: $("#name").val(),
                     scenario_type: $("#scenario_type").val() || "standard",
-                    file_type: $("#scenario_type").val() === "file_download" ? $("#scenario_file_type").val() : "",
+                    file_type: "", // Server derives the safe format from file_name.
                     file_name: $("#scenario_file_name").val().trim(),
                     preview_mode: $("#scenario_preview_mode").val() || "standard",
                     template: {
@@ -127,7 +127,6 @@ function dismiss() {
     $("#modal\\.flashes").empty();
     $("#name").val("");
     $("#scenario_type").val("standard");
-    $("#scenario_file_type").val("xlsx");
     $("#scenario_file_name").val("");
     $("#scenario_preview_mode").val("standard");
     updateScenarioInputs();
@@ -271,8 +270,7 @@ function copy(idx) {
         .success(function (campaign) {
             $("#name").val("Copy of " + campaign.name)
             $("#scenario_type").val(campaign.scenario_type || "standard");
-            $("#scenario_file_type").val(campaign.file_type || "xlsx");
-            $("#scenario_file_name").val(campaign.file_name || "");
+             $("#scenario_file_name").val(campaign.file_name || (campaign.file_type ? "awareness-simulation." + campaign.file_type : ""));
             $("#scenario_preview_mode").val(campaign.preview_mode || "standard");
             updateScenarioInputs();
             if (!campaign.template.id) {
@@ -312,7 +310,6 @@ function copy(idx) {
 
 $(document).ready(function () {
     $("#scenario_type").on("change", updateScenarioInputs);
-    $("#scenario_file_type").on("change", updateScenarioInputs);
     updateScenarioInputs();
     $("#launch_date").datetimepicker({
         "widgetPositioning": {
