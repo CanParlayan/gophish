@@ -161,10 +161,24 @@ func (c *Campaign) Validate() error {
 		return errors.New("invalid scenario_type")
 	}
 	if c.ScenarioType == "file_download" {
+		// The filename is the source of truth for new campaigns. Older
+		// clients may still submit file_type without a filename.
+		c.FileName = strings.TrimSpace(c.FileName)
+		if c.FileName != "" {
+			dot := strings.LastIndexByte(c.FileName, '.')
+			if dot == -1 {
+				return errors.New("dosya adı .html, .pdf, .xlsx veya .docx ile bitmeli")
+			}
+			extension := strings.ToLower(c.FileName[dot+1:])
+			if c.FileType != "" && c.FileType != extension {
+				return errors.New("file_type ile dosya adı uzantısı uyuşmuyor")
+			}
+			c.FileType = extension
+		}
 		switch c.FileType {
 		case "xlsx", "docx", "pdf", "html":
 		default:
-			return errors.New("invalid file_type")
+			return errors.New("dosya adı .html, .pdf, .xlsx veya .docx ile bitmeli")
 		}
 		if c.PreviewMode == "" {
 			c.PreviewMode = "standard"
