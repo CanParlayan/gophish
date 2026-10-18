@@ -1,81 +1,126 @@
-# GoPhish - Senaryo ve Dosya İndirme Simülasyonu
+# GoPhish — File Simulation V2 (Türkçe)
 
-## Özellikler
+> **Durum:** Kaynak kod GitHub branch'inde. Yeni sürüm için sunucu derlemesi,
+> otomatik testler ve tarayıcı kabul testleri henüz çalıştırılmadı.
+> Testler geçmeden production'a uygulanmamalıdır.
 
-Bu fork, standart GoPhish kampanyalarına ek olarak Scenario Type
-ve File Type seçenekleri sunar.
+## Amaç ve kapsam
 
-File Download Simulation kapsamında HTML rapor indirme akışı,
-dosya sunma olayı ve dosya açılma sinyali ayrı izlenir.
+Yetkili güvenlik farkındalığı kampanyalarında güvenli dosya indirme ve
+simüle edilmiş tarayıcı önizlemesi ölçmek.
 
-## Kampanya oluşturma
+Desteklenen gerçek örnek dosyalar:
 
-1. New Campaign ekranını açın.
-2. Scenario Type olarak File Download Simulation seçin.
-3. File Type olarak HTML Rapor Önizlemesi seçin.
-4. Email Template, Landing Page, URL, Sending Profile ve Group seçin.
-5. Kampanyayı başlatın.
-6. Campaign Results ekranından olayları inceleyin.
+| Dosya türü | Oluşan içerik | Açılma sinyali |
+|---|---|---|
+| HTML (.html) | Statik HTML raporu | Uzak görsel isteği alınabilir; **kanıt değildir** |
+| PDF (.pdf) | Geçerli minimal PDF | Hayır |
+| Excel (.xlsx) | Makrosuz, geçerli OOXML çalışma kitabı | Hayır |
+| Word (.docx) | Makrosuz, geçerli OOXML belge | Hayır |
 
-## Landing Page
+Özel dosya yükleme, EXE, makro ve dosya açılışında yerel kod yürütme
+**desteklenmez**. Bir HTML dosyasına başka uzantı verilmez.
 
-Mevcut uygulama, download-intent kimlikli formu kullanan
-indirme butonlarını destekler.
+## Yeni kampanya oluşturma
 
-Örnek:
+1. New Campaign → **File Download Simulation** seçin.
+2. **File Type** üzerinden HTML, PDF, Excel veya Word seçin.
+3. **Download filename** alanına örneğin `Finansal_Ozet.pdf` yazın; boş
+   bırakıldığında dosya adı otomatik oluşturulur.
+   Sadece güvenli ASCII dosya adları (en çok 80 karakter) kabul edilir;
+   uzantı seçilen gerçek biçimle eşleşmelidir.
+4. **Preview mode** seçin:
+   - **Standard Download:** İndir kontrolü doğrudan dosyayı sunar.
+   - **Preview Error:** İndir kontrolü simüle edilmiş “Bu dosyayı açamıyoruz”
+     sayfasına gider; kullanıcı Yenile veya Dosyayı indir seçebilir.
+   - **Download + Preview:** İndir kontrolü bilgi/önizleme sayfasına
+     gider; kullanıcı buradan Dosyayı indir seçer. Otomatik indirme yapılmaz.
+5. Email Template, Landing Page, URL, Sending Profile ve hedef Group seçin.
+6. Kapsamı doğrulayın, test alıcısıyla denedikten sonra kampanyayı başlatın.
 
-<form id="download-intent" method="GET">
-</form>
+## Landing Page uyumluluğu
 
+GoPhish, Landing Page'in mevcut indirme butonlarını tekrar kullanır.
+Yeni ve görünür bir buton eklemez. Bu iki kontrol yapısından biri gereklidir:
+
+```html
+<form id="download-intent" method="GET"></form>
 <button type="submit" form="download-intent">İndir</button>
+```
 
-Uygulama bu formun action adresini kampanyaya özel
-/download-report?rid=... endpoint'ine yönlendirir.
+veya
 
-Bu yapı kullanıldığında ayrıca görünür indirme bağlantısı
-eklenmemesi hedeflenir.
+```html
+<a id="download" href="#">Download</a>
+```
 
-## Olayların anlamları
+Sunucu, `download-intent` formuna `name="rid"` gizli alanını ekler.
+GET formunun `action` query string'i `rid` taşımak için kullanılmaz.
+Önizleme modlarında yine formun içine `preview=1` eklenir.
 
-- Email Sent: E-posta gönderildi.
-- Email Opened: E-posta açılma sinyali alındı.
-- Clicked Link: Kampanya bağlantısı ziyaret edildi.
-- File Download Served: Sunucu dosya isteğine yanıt verdi.
-- File Open Signal: Dosya açılma sinyali alındı.
-- Submitted Data: Normal form gönderimi olayıdır.
+Endpoint'ler:
 
-File Download Simulation için Submitted Data kullanılması gerekmez.
+- `/dev-file-landing?rid=...`: Seçilmiş Landing Page.
+- `/dev-file-landing?rid=...&preview=1`: Simüle önizleme.
+- `/download-report?rid=...`: Seçilen gerçek dosya biçimi.
+- `/download-simulation?rid=...`: Eski doğrudan PDF/XLSX/DOCX
+  bağlantıları için geriye dönük uyumluluk.
+- `/file-open-signal?rid=...`: Yalnızca HTML uzaktan görüntü talebi.
 
-File Download Served, dosyanın cihaza kaydedildiğini kesin olarak
-kanıtlamaz. File Open Signal da dosyanın gerçekten açıldığının
-kesin kanıtı değildir.
+Mevcut Apache `/dev-file-landing` ve `/download-report` yönlendirmeleri
+yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekmez.
 
-## Derleme
+## Event anlamları
 
+| Olay | Sunucunun kesin olarak bildiği |
+|---|---|
+| Clicked Link | Landing bağlantısına HTTP isteği geldi |
+| File Download Served | Dosyanın HTTP yanıtı sunucu tarafından gönderildi |
+| Preview Shown | Simüle önizleme HTTP yanıtı gönderildi |
+| Retry Clicked | Önizlemenin Yenile bağlantısına istek geldi |
+| File Open Signal | HTML içindeki uzaktaki görsele ağ isteği geldi |
+
+**Hiçbiri dosyanın kaydedildiğini, insan tarafından açıldığını veya
+çalıştırıldığını tek başına kanıtlamaz.** PDF, XLSX ve DOCX dosyalarında
+yerel dosya açma telemetrisi yoktur. Yeni indirme tıklamaları
+`Submitted Data` olarak kaydedilmemelidir.
+
+## Veri tabanı ve geriye dönük uyumluluk
+
+Yeni migration: `20261019010000_file_simulation_v2.sql` (SQLite/MySQL).
+`campaigns` tablosuna `file_name` ve `preview_mode` eklenir.
+Mevcut kampanyalarda `preview_mode=standard`, boş dosya adı için
+sunucu biçime uygun varsayılan isim kullanır. Önceki migration'lar korunur.
+Yeni sürümden önce **DB ve binary yedeği** alınmalıdır.
+
+## SSH ile güncelleme — önce test
+
+```bash
+cd /home/pentester/gophish-src-v0.12.1
+git fetch fork feature/scenario-tracking
+git switch feature/scenario-tracking
+git pull --ff-only fork feature/scenario-tracking
+gofmt -w models/campaign.go models/dev_html_landing_validation.go \
+  controllers/dev_file_landing.go controllers/dev_html_report.go \
+  controllers/file_simulation_v2.go controllers/phish.go
 go test ./models ./controllers
-go build -o /tmp/gophish-production-new .
+go build -o /tmp/gophish-production-v2 .
+```
 
-## Production
+`gofmt` kaynak dosyalarını değiştirir; format farklarını gerekiyorsa
+ayrı commit'leyin. GitHub'a gizli anahtar, production `config.json`,
+DB, hedef listesi, log veya binary göndermeyin.
 
-Servis: gophish.service
-Binary: /home/pentester/gophish/gophish
-Kaynak: /home/pentester/gophish-src-v0.12.1
+## Production kabul matrisi
 
-Production binary değiştirilmeden önce yedek alınmalıdır.
+Yeni test kampanyasında her format için Standard Download, Preview Error,
+Download + Preview doğrulanmalı (4 × 3 senaryo). Her senaryoda:
 
-## Test durumu - 19 Ekim 2026
+1. Mevcut İndir kontrolü çalışmalı; altına üçüncü buton eklenmemeli.
+2. İndirilen dosya **gerçek seçilen biçimde** açılmalı; dosya adı uygun olmalı.
+3. Önizleme/Yenile olayları gerektiğinde oluşmalı; yeni Submitted Data oluşmamalı.
+4. Eski HTML kampanyalarının indirmesi bozulmamalı.
 
-- Models testleri: PASS
-- Controllers testleri: PASS
-- Go binary derlemesi: PASS
-- Production servis başlangıcı: PASS
-- Binary SHA256 eşleşmesi: PASS
-- Tarayıcıda indirme akışı: Henüz doğrulanmadı
-
-## Güvenlik
-
-Production veritabanları, config.json, SMTP parolaları,
-API anahtarları, özel anahtarlar, loglar ve yedekler
-GitHub'a gönderilmemelidir.
-
-Simülasyonlar yalnızca yetkili kapsamda yürütülmelidir.
+Önce sadece yetkili test alıcısı kullanın. Testler geçmeden aktif
+kampanyalara dokunmayın. Servis yeniden başlatma ve rollback işlemleri
+için güncel production binary'si ve veritabanını ayrı ayrı yedekleyin.
