@@ -1,8 +1,8 @@
 # GoPhish — File Simulation V2 (Türkçe)
 
-> **Durum:** V2 temel sürüm sunucuda çalışıyor. Dosya adından biçim belirleme,
-> HTML hata akışı ve HTTP-only raporlama düzeltmeleri GitHub branch'indedir.
-> Bunlar test/deploy edilmeden canlı sürüm olarak kabul edilmemelidir.
+> **Durum:** Temel V2 sunucuda çalışıyor. Dosya indirme gösterimini
+> sadeleştiren son arayüz düzeltmeleri GitHub branch'indedir;
+> sunucuda test/deploy edilmeden canlı kabul edilmemelidir.
 
 ## Amaç ve kapsam
 
@@ -33,14 +33,8 @@ uzantı verilmez.
    Sadece güvenli ASCII dosya adları (en çok 80 karakter) kabul edilir.
    Eski API istemcileri `file_type` göndermeye devam edebilir; alanlar
    çelişirse istek reddedilir.
-3. **Preview mode** seçin:
-   - **Standard Download:** İndir kontrolü doğrudan dosyayı sunar.
-   - **Preview Error:** HTML'de İndir düğmesi doğrudan HTML dosyasını
-     indirir; açıldığında HTML belgesinin içinde simüle hata gösterilir.
-     PDF/Word/Excel'de İndir kontrolü öncelikle tarayıcıdaki simüle
-     hata sayfasına gider; kullanıcı Yenile veya Dosyayı indir seçebilir.
-   - **Download + Preview:** İndir kontrolü bilgi/önizleme sayfasına
-     gider; kullanıcı buradan Dosyayı indir seçer. Otomatik indirme yapılmaz.
+3. Yeni kampanyalarda önizleme modu yoktur: İndir doğrudan güvenli örnek
+   dosyayı sunar. Önceden oluşturulmuş kampanyaların ayarları değiştirilmez.
 4. Email Template, Landing Page, URL, Sending Profile ve hedef Group seçin.
 5. Kapsamı doğrulayın, test alıcısıyla denedikten sonra kampanyayı başlatın.
 
@@ -62,8 +56,8 @@ veya
 
 Sunucu, `download-intent` formuna `name="rid"` gizli alanını ekler.
 GET formunun `action` query string'i `rid` taşımak için kullanılmaz.
-Önizleme modlarında (HTML hata modu hariç) formun içine
-`preview=1` eklenir.
+Eski önizleme modlarını kullanan mevcut kampanyalarda `preview=1`
+yönlendirmesi geriye dönük uyumluluk için korunur.
 
 Endpoint'ler:
 
@@ -75,6 +69,18 @@ Endpoint'ler:
 
 Mevcut Apache `/dev-file-landing` ve `/download-report` yönlendirmeleri
 yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekmez.
+
+## File Download Simulation gösterimi
+
+File Download Simulation raporunda, standart kampanya grafiklerinden ayrı,
+yedi küçük yüzde göstergesi bulunur: Gönderildi, Etkileşim yok,
+Açıldı (e-posta), Tıklandı, İndirildi, Dosya açıldı, Raporlandı.
+
+İndirildi sayısı benzersiz alıcıların `File Download Served` HTTP olayından
+hesaplanır; tekrar eden istekler ayrı kişi sayılmaz. Dosya açıldı göstergesi
+bilinmeyen değerdir (**Ölçülemiyor**), yüzde sıfır değildir: indirilen
+yerel PDF/Office/HTML dosyalarının açılışı GoPhish tarafından ölçülemez.
+Standard Campaign raporu ve eski olay kayıtları korunur.
 
 ## Event anlamları
 
@@ -121,14 +127,13 @@ DB, hedef listesi, log veya binary göndermeyin.
 
 ## Production kabul matrisi
 
-Yeni test kampanyasında her format için Standard Download, Preview Error,
-Download + Preview doğrulanmalı (4 × 3 senaryo). HTML Preview Error akışında
-ara hata sayfası yerine doğrudan indirme ve dosya içinde hata görünümü
-beklenir. Her senaryoda:
+Yeni kampanyalarda güvenli **doğrudan indirme** akışı doğrulanmalıdır.
+Eski kampanyalardaki önizleme seçenekleri veri uyumluluğu için korunur.
+Her senaryoda:
 
 1. Mevcut İndir kontrolü çalışmalı; altına üçüncü buton eklenmemeli.
 2. İndirilen dosya **gerçek seçilen biçimde** açılmalı; dosya adı uygun olmalı.
-3. Önizleme/Yenile olayları gerektiğinde oluşmalı; yeni Submitted Data oluşmamalı.
+3. Dosya indirme olayı benzersiz alıcıya yazılmalı; yeni Submitted Data oluşmamalı.
 4. Eski HTML kampanyalarının indirmesi bozulmamalı.
 5. Yeni HTML dosyasında uzak görsel/izleme pikseli bulunmamalı; artık
    `File Open Signal` üretilmemeli. Eski olay geçmişi korunmalı.
