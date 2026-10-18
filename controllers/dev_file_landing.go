@@ -1,11 +1,10 @@
 package controllers
 
-// DEV_SERVER_SIDE_HTML_JOURNEY_V1
-// Reuse the selected GoPhish landing page and Clicked Link handler; append an
-// explicit HTML download control WITHOUT editing saved landing-page templates.
+// File Simulation V2: render the selected GoPhish page and bind its existing download control.
 import (
 	"bytes"
 	"html"
+	"net/url"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +13,7 @@ import (
 )
 
 func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.Request) {
-	rs, _, ok := devReportRecipient(r)
+	rs, c, ok := devReportRecipient(r)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -41,25 +40,44 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Use the landing page's existing download buttons.
-	// Never inject an additional visible download link.
-
-	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
-	position := formRE.FindIndex(body)
-
-	if position == nil {
-		http.Error(w, "Landing Page: download-intent form not found", http.StatusUnprocessableEntity)
-		return
+	// Reuse existing controls. GET forms must submit rid as a named
+	// field: query strings in a GET form action may be discarded by browsers.
+	target := "/download-report"
+	if c.PreviewMode == "error" || c.PreviewMode == "download_preview" {
+		target = "/file-preview"
 	}
-
-	newForm := []byte(`<form id="download-intent" action="/download-report" method="GET">` +
-		`<input type="hidden" name="rid" value="` +
-		html.EscapeString(rs.RId) + `">`)
-
-	updated := make([]byte, 0, len(body)+len(newForm))
-	updated = append(updated, body[:position[0]]...)
-	updated = append(updated, newForm...)
-	body = append(updated, body[position[1]:]...)
+	formRE := regexp.MustCompile(`(?is)<form\b[^>]*\bid\s*=\s*["']download-intent["'][^>]*>`)
+	if position := formRE.FindIndex(body); position != nil {
+		newForm := []byte(`<form id="download-intent" action="` +
+			html.EscapeString(target) + `" method="GET">` +
+			`<input type="hidden" name="rid" value="` +
+			html.EscapeString(rs.RId) + `">`)
+		updated := make([]byte, 0, len(body)+len(newForm))
+		updated = append(updated, body[:position[0]]...)
+		updated = append(updated, newForm...)
+		body = append(updated, body[position[1]:]...)
+	} else {
+		// Older pages can use an existing <a id="download"> instead.
+		// Do not append a new visible button.
+		anchorRE := regexp.MustCompile(`(?is)<a\b[^>]*\bid\s*=\s*["']download["'][^>]*>`)
+		hrefRE := regexp.MustCompile(`(?i)\bhref\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)`)
+		position := anchorRE.FindIndex(body)
+		if position == nil {
+			http.Error(w, "Landing Page: existing download control not found", http.StatusUnprocessableEntity)
+			return
+		}
+		anchor := string(body[position[0]:position[1]])
+		href := `href="` + html.EscapeString(target+"?rid="+url.QueryEscape(rs.RId)) + `"`
+		if hrefRE.MatchString(anchor) {
+			anchor = hrefRE.ReplaceAllString(anchor, href)
+		} else {
+			anchor = strings.TrimSuffix(anchor, ">") + " " + href + ">"
+		}
+		updated := make([]byte, 0, len(body)+len(anchor))
+		updated = append(updated, body[:position[0]]...)
+		updated = append(updated, anchor...)
+		body = append(updated, body[position[1]:]...)
+	}
 
 	// Remove the obsolete event field.
 	intentRE := regexp.MustCompile(`(?is)<input\b[^>]*\bname\s*=\s*["']simulation_event["'][^>]*>`)
@@ -79,8 +97,10 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 		}
 		return script
 	})
-	body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("HTML biçimindeki raporunuzu"))
-	body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("HTML Raporunu İndir"))
+	if c.FileType == "html" {
+		body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("HTML biçimindeki raporunuzu"))
+		body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("HTML Raporunu İndir"))
+	}
 	w.Header().Del("Content-Length")
 	w.Header().Del("Content-Encoding")
 	w.Header().Del("ETag")
