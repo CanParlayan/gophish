@@ -1,8 +1,8 @@
 # GoPhish — File Simulation V2 (Türkçe)
 
-> **Durum:** V2 temel sürüm sunucuda test edilip çalıştırıldı. Sonraki
-> dosya adı ve HTML hata akışı düzeltmeleri GitHub branch'indedir;
-> bunlar için yeniden test ve kontrollü deployment gerekir.
+> **Durum:** V2 temel sürüm sunucuda çalışıyor. Dosya adından biçim belirleme,
+> HTML hata akışı ve HTTP-only raporlama düzeltmeleri GitHub branch'indedir.
+> Bunlar test/deploy edilmeden canlı sürüm olarak kabul edilmemelidir.
 
 ## Amaç ve kapsam
 
@@ -11,15 +11,18 @@ simüle edilmiş tarayıcı önizlemesi ölçmek.
 
 Desteklenen gerçek örnek dosyalar:
 
-| Dosya türü | Oluşan içerik | Açılma sinyali |
+| Dosya türü | Oluşan içerik | Tek dosya metriği |
 |---|---|---|
-| HTML (.html) | Statik HTML raporu | Uzak görsel isteği alınabilir; **kanıt değildir** |
-| PDF (.pdf) | Geçerli minimal PDF | Hayır |
-| Excel (.xlsx) | Makrosuz, geçerli OOXML çalışma kitabı | Hayır |
-| Word (.docx) | Makrosuz, geçerli OOXML belge | Hayır |
+| HTML (.html) | Yerel açılabilen statik HTML raporu | HTTP dosya yanıtı |
+| PDF (.pdf) | Geçerli minimal PDF | HTTP dosya yanıtı |
+| Excel (.xlsx) | Makrosuz, geçerli OOXML çalışma kitabı | HTTP dosya yanıtı |
+| Word (.docx) | Makrosuz, geçerli OOXML belge | HTTP dosya yanıtı |
 
-Özel dosya yükleme, EXE, makro ve dosya açılışında yerel kod yürütme
-**desteklenmez**. Bir HTML dosyasına başka uzantı verilmez.
+**Tercih edilen tek yöntem GoPhish HTTP takibidir.** Ayrı ajan, endpoint
+entegrasyonu, belge içine doğrulama bağlantısı veya uzaktan görsel
+yükleyerek açılma takibi yoktur. Özel dosya yükleme, EXE, makro ve dosya
+açılışında yerel kod yürütme **desteklenmez**. Bir HTML dosyasına başka
+uzantı verilmez.
 
 ## Yeni kampanya oluşturma
 
@@ -69,9 +72,6 @@ Endpoint'ler:
 - `/download-report?rid=...`: Seçilen gerçek dosya biçimi.
 - `/download-simulation?rid=...`: Eski doğrudan PDF/XLSX/DOCX
   bağlantıları için geriye dönük uyumluluk.
-- `/file-open-signal?rid=...`: Yalnızca HTML uzaktan görüntü talebi.
-  HTML belgesi yerel dosya olarak açıldığında tarayıcı güvenlik ayarları
-  dış ağ isteğini engelleyebilir; sinyal garantili değildir.
 
 Mevcut Apache `/dev-file-landing` ve `/download-report` yönlendirmeleri
 yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekmez.
@@ -84,12 +84,14 @@ yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekm
 | File Download Served | Dosyanın HTTP yanıtı sunucu tarafından gönderildi |
 | Preview Shown | Simüle önizleme HTTP yanıtı gönderildi |
 | Retry Clicked | Önizlemenin Yenile bağlantısına istek geldi |
-| File Open Signal | HTML içindeki uzaktaki görsele ağ isteği geldi |
+| File Open Signal (eski kayıtlar) | Önceden oluşturulmuş HTML kampanyasının tarihsel ağ isteği; yeni sinyal üretilmez |
 
 **Hiçbiri dosyanın kaydedildiğini, insan tarafından açıldığını veya
-çalıştırıldığını tek başına kanıtlamaz.** PDF, XLSX ve DOCX dosyalarında
-yerel dosya açma telemetrisi yoktur. Yeni indirme tıklamaları
-`Submitted Data` olarak kaydedilmemelidir.
+çalıştırıldığını kanıtlamaz.** Yeni HTML belgelerinde de dış kaynak
+yükleme/ayrı açılma sinyali yoktur. Eski olaylar denetim geçmişi olarak
+veritabanında kalır fakat açılma grafiği veya yeni rozet olarak
+gösterilmez. Sonuçlarda yalnızca HTTP dosya yanıtı metriği bulunur.
+Yeni indirme tıklamaları `Submitted Data` olarak kaydedilmemelidir.
 
 ## Veri tabanı ve geriye dönük uyumluluk
 
@@ -128,6 +130,8 @@ beklenir. Her senaryoda:
 2. İndirilen dosya **gerçek seçilen biçimde** açılmalı; dosya adı uygun olmalı.
 3. Önizleme/Yenile olayları gerektiğinde oluşmalı; yeni Submitted Data oluşmamalı.
 4. Eski HTML kampanyalarının indirmesi bozulmamalı.
+5. Yeni HTML dosyasında uzak görsel/izleme pikseli bulunmamalı; artık
+   `File Open Signal` üretilmemeli. Eski olay geçmişi korunmalı.
 
 Önce sadece yetkili test alıcısı kullanın. Testler geçmeden aktif
 kampanyalara dokunmayın. Servis yeniden başlatma ve rollback işlemleri
