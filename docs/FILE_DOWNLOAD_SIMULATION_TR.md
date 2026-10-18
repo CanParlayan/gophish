@@ -1,8 +1,8 @@
 # GoPhish — File Simulation V2 (Türkçe)
 
-> **Durum:** Kaynak kod GitHub branch'inde. Yeni sürüm için sunucu derlemesi,
-> otomatik testler ve tarayıcı kabul testleri henüz çalıştırılmadı.
-> Testler geçmeden production'a uygulanmamalıdır.
+> **Durum:** V2 temel sürüm sunucuda test edilip çalıştırıldı. Sonraki
+> dosya adı ve HTML hata akışı düzeltmeleri GitHub branch'indedir;
+> bunlar için yeniden test ve kontrollü deployment gerekir.
 
 ## Amaç ve kapsam
 
@@ -24,19 +24,22 @@ Desteklenen gerçek örnek dosyalar:
 ## Yeni kampanya oluşturma
 
 1. New Campaign → **File Download Simulation** seçin.
-2. **File Type** üzerinden HTML, PDF, Excel veya Word seçin.
-3. **Download filename** alanına örneğin `Finansal_Ozet.pdf` yazın; boş
-   bırakıldığında dosya adı otomatik oluşturulur.
-   Sadece güvenli ASCII dosya adları (en çok 80 karakter) kabul edilir;
-   uzantı seçilen gerçek biçimle eşleşmelidir.
-4. **Preview mode** seçin:
+2. **Dosya adı** alanına `Finansal_Ozet.pdf`, `rapor.html`,
+   `ornek.xlsx` veya `ornek.docx` yazın. Ayrı tür seçimi yoktur;
+   sistem gerçek formatı uzantıdan belirler.
+   Sadece güvenli ASCII dosya adları (en çok 80 karakter) kabul edilir.
+   Eski API istemcileri `file_type` göndermeye devam edebilir; alanlar
+   çelişirse istek reddedilir.
+3. **Preview mode** seçin:
    - **Standard Download:** İndir kontrolü doğrudan dosyayı sunar.
-   - **Preview Error:** İndir kontrolü simüle edilmiş “Bu dosyayı açamıyoruz”
-     sayfasına gider; kullanıcı Yenile veya Dosyayı indir seçebilir.
+   - **Preview Error:** HTML'de İndir düğmesi doğrudan HTML dosyasını
+     indirir; açıldığında HTML belgesinin içinde simüle hata gösterilir.
+     PDF/Word/Excel'de İndir kontrolü öncelikle tarayıcıdaki simüle
+     hata sayfasına gider; kullanıcı Yenile veya Dosyayı indir seçebilir.
    - **Download + Preview:** İndir kontrolü bilgi/önizleme sayfasına
      gider; kullanıcı buradan Dosyayı indir seçer. Otomatik indirme yapılmaz.
-5. Email Template, Landing Page, URL, Sending Profile ve hedef Group seçin.
-6. Kapsamı doğrulayın, test alıcısıyla denedikten sonra kampanyayı başlatın.
+4. Email Template, Landing Page, URL, Sending Profile ve hedef Group seçin.
+5. Kapsamı doğrulayın, test alıcısıyla denedikten sonra kampanyayı başlatın.
 
 ## Landing Page uyumluluğu
 
@@ -56,7 +59,8 @@ veya
 
 Sunucu, `download-intent` formuna `name="rid"` gizli alanını ekler.
 GET formunun `action` query string'i `rid` taşımak için kullanılmaz.
-Önizleme modlarında yine formun içine `preview=1` eklenir.
+Önizleme modlarında (HTML hata modu hariç) formun içine
+`preview=1` eklenir.
 
 Endpoint'ler:
 
@@ -66,6 +70,8 @@ Endpoint'ler:
 - `/download-simulation?rid=...`: Eski doğrudan PDF/XLSX/DOCX
   bağlantıları için geriye dönük uyumluluk.
 - `/file-open-signal?rid=...`: Yalnızca HTML uzaktan görüntü talebi.
+  HTML belgesi yerel dosya olarak açıldığında tarayıcı güvenlik ayarları
+  dış ağ isteğini engelleyebilir; sinyal garantili değildir.
 
 Mevcut Apache `/dev-file-landing` ve `/download-report` yönlendirmeleri
 yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekmez.
@@ -114,7 +120,9 @@ DB, hedef listesi, log veya binary göndermeyin.
 ## Production kabul matrisi
 
 Yeni test kampanyasında her format için Standard Download, Preview Error,
-Download + Preview doğrulanmalı (4 × 3 senaryo). Her senaryoda:
+Download + Preview doğrulanmalı (4 × 3 senaryo). HTML Preview Error akışında
+ara hata sayfası yerine doğrudan indirme ve dosya içinde hata görünümü
+beklenir. Her senaryoda:
 
 1. Mevcut İndir kontrolü çalışmalı; altına üçüncü buton eklenmemeli.
 2. İndirilen dosya **gerçek seçilen biçimde** açılmalı; dosya adı uygun olmalı.
