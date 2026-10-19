@@ -3,6 +3,7 @@ package controllers
 import (
 	"archive/zip"
 	"bytes"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -63,5 +64,36 @@ func TestFileSimulationV2PreviewInput(t *testing.T) {
 	}
 	if !strings.Contains(previewInput("/dev-file-landing"), `name="preview" value="1"`) {
 		t.Fatal("preview form must have a named preview input")
+	}
+}
+
+func TestWebDocumentViewerLinksAndNoPixel(t *testing.T) {
+	for _, kind := range []string{"pdf", "html"} {
+		c := models.Campaign{ScenarioType: "file_download", FileType: kind,
+			FileName: "ornek." + kind, PreviewMode: "web_view"}
+		rs := models.Result{RId: "AbC1234"}
+		w := httptest.NewRecorder()
+		(&PhishingServer{}).webDocumentViewer(w, rs, c)
+		if w.Code != 200 {
+			t.Fatalf("viewer %s returned %d", kind, w.Code)
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, `src="/download-report?rid=AbC1234&amp;inline=1"`) ||
+			!strings.Contains(body, `href="/download-report?rid=AbC1234"`) {
+			t.Errorf("%s viewer inline or attachment URL missing", kind)
+		}
+		if strings.Contains(body, "file-open-signal") || strings.Contains(body, "tracker.sympanion.com") {
+			t.Errorf("%s viewer must not contain remote tracking pixels", kind)
+		}
+		if !strings.Contains(w.Header().Get("Content-Security-Policy"), "frame-src 'self'") {
+			t.Errorf("%s viewer does not allow a same-origin document iframe", kind)
+		}
+	}
+	legacy := models.Campaign{ScenarioType: "file_download", FileType: "pdf",
+		FileName: "ornek.pdf", PreviewMode: "standard"}
+	w := httptest.NewRecorder()
+	(&PhishingServer{}).webDocumentViewer(w, models.Result{RId: "AbC1234"}, legacy)
+	if w.Code != 404 {
+		t.Fatalf("legacy campaign unexpectedly served web viewer: %d", w.Code)
 	}
 }
