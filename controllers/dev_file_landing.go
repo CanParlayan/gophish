@@ -56,7 +56,7 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	target := "/download-report"
 	// An HTML error simulation belongs inside the downloaded HTML file,
 	// not in a separate web page reached by an "İndir" button.
-	if c.PreviewMode == "web_view" || c.PreviewMode == "download_preview" ||
+	if c.PreviewMode == "download_preview" ||
 		(c.PreviewMode == "error" && c.FileType != "html") {
 		target = "/dev-file-landing"
 	}
@@ -119,16 +119,6 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	if c.FileType == "html" {
 		body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("HTML biçimindeki raporunuzu"))
 		body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("HTML Raporunu İndir"))
-	} else if c.FileType == "pdf" && c.PreviewMode == "web_view" {
-		body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("PDF raporunuzu"))
-		body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("PDF Raporunu İndir"))
-	}
-	if c.PreviewMode == "web_view" {
-		// The first action opens the browser viewer; downloading is offered
-		// separately inside it. Do not label that action as a direct download.
-		body = bytes.ReplaceAll(body, []byte("Raporunu İndir"), []byte("Raporunu Görüntüle"))
-		body = bytes.ReplaceAll(body, []byte(">Dosyayı indir<"), []byte(">Dosyayı görüntüle<"))
-		body = bytes.ReplaceAll(body, []byte(">İndir<"), []byte(">Görüntüle<"))
 	}
 	w.Header().Del("Content-Length")
 	w.Header().Del("Content-Encoding")
