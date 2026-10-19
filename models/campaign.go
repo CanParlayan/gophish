@@ -188,7 +188,7 @@ func (c *Campaign) Validate() error {
 			c.PreviewMode = "standard"
 		}
 		switch c.PreviewMode {
-		case "standard", "error", "download_preview":
+		case "standard", "error", "download_preview", "web_view":
 		default:
 			return errors.New("invalid preview_mode")
 		}
