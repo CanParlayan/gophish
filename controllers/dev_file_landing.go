@@ -113,6 +113,16 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	if c.FileType == "html" {
 		body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("HTML biçimindeki raporunuzu"))
 		body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("HTML Raporunu İndir"))
+	} else if c.FileType == "pdf" && c.PreviewMode == "web_view" {
+		body = bytes.ReplaceAll(body, []byte("Excel formatındaki raporunuzu"), []byte("PDF raporunuzu"))
+		body = bytes.ReplaceAll(body, []byte("Excel Raporunu İndir"), []byte("PDF Raporunu İndir"))
+	}
+	if c.PreviewMode == "web_view" {
+		// The first action opens the browser viewer; downloading is offered
+		// separately inside it. Do not label that action as a direct download.
+		body = bytes.ReplaceAll(body, []byte("Raporunu İndir"), []byte("Raporunu Görüntüle"))
+		body = bytes.ReplaceAll(body, []byte(">Dosyayı indir<"), []byte(">Dosyayı görüntüle<"))
+		body = bytes.ReplaceAll(body, []byte(">İndir<"), []byte(">Görüntüle<"))
 	}
 	w.Header().Del("Content-Length")
 	w.Header().Del("Content-Encoding")
