@@ -155,13 +155,6 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 		http.NotFound(w, r)
 		return
 	}
-	// Inline responses exist only for new PDF web-viewer campaigns.
-	// Direct downloads retain their existing attachment behavior.
-	webInline := r.URL.Query().Get("inline") == "1" && c.PreviewMode == "web_view" && c.FileType == "pdf"
-	if r.URL.Query().Get("inline") != "" && !webInline {
-		http.NotFound(w, r)
-		return
-	}
 	var body []byte
 	var mime, name string
 	switch c.FileType {
@@ -192,11 +185,7 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 		return
 	}
 	w.Header().Set("Content-Type", mime)
-	disposition := "attachment"
-	if webInline {
-		disposition = "inline"
-	}
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`%s; filename=%q`, disposition, name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
@@ -204,15 +193,8 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 		log.Warnf("simulation file response error: %v", err)
 		return
 	}
-	if webInline {
-		// Record only that the viewer requested the inline PDF bytes.
-		if err := rs.HandleWebDocumentViewed(c.FileType); err != nil {
-			log.Error(err)
-		}
-	} else {
-		if err := rs.HandleFileDownloadServed(c.FileType); err != nil {
-			log.Error(err)
-		}
+	if err := rs.HandleFileDownloadServed(c.FileType); err != nil {
+		log.Error(err)
 	}
 }
 
