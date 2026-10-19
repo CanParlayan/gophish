@@ -22,7 +22,6 @@ func (ps *PhishingServer) ServeHTMLDocumentOpenSignal(w http.ResponseWriter, r *
 	w.Header().Set("Cache-Control", "no-store, no-cache, max-age=0")
 	w.Header().Set("Content-Type", "image/gif")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Content-Length", "43")
 	_, _ = w.Write([]byte{
 		0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00,
 		0x80, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21,
