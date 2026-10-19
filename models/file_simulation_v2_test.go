@@ -32,19 +32,31 @@ func TestFileSimulationV2Validation(t *testing.T) {
 			t.Errorf("%s is not valid: %v", kind, err)
 		}
 	}
-	for _, mode := range []string{"standard", "error", "download_preview", "web_view"} {
+	for _, mode := range []string{"standard", "error", "download_preview", "pdf_blank"} {
 		c := validSimulationCampaign()
 		c.PreviewMode = mode
 		if err := c.Validate(); err != nil {
 			t.Errorf("mode %q: %v", mode, err)
 		}
 	}
-	for _, kind := range []string{"xlsx", "docx"} {
+	for _, tc := range []struct {
+		kind, mode string
+		ok         bool
+	}{
+		{"html", "html_signal", true},
+		{"pdf", "pdf_blank", true},
+		{"pdf", "html_signal", false},
+		{"html", "pdf_blank", false},
+		{"docx", "html_signal", false},
+		{"xlsx", "pdf_blank", false},
+		{"pdf", "web_view", false},
+	} {
 		c := validSimulationCampaign()
-		c.FileType = kind
-		c.PreviewMode = "web_view"
-		if err := c.Validate(); err == nil {
-			t.Errorf("web viewer wrongly allowed for %s", kind)
+		c.FileType = tc.kind
+		c.PreviewMode = tc.mode
+		err := c.Validate()
+		if (err == nil) != tc.ok {
+			t.Errorf("%s %s expected accepted=%v, error=%v", tc.kind, tc.mode, tc.ok, err)
 		}
 	}
 	for _, name := range []string{"../report.pdf", "report.xlsx", "report.pdf\r\nHeader: x", ".pdf", strings.Repeat("a", 90)+".pdf"} {
