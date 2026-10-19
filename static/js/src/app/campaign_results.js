@@ -52,9 +52,9 @@ var statuses = {
         icon: "fa-download",
         point: "ct-point-clicked"
     },
-    "Web File Viewed": {
+    "HTML Open Signal": {
         color: "#2caa84",
-        label: "label-success",
+        label: "label-info",
         icon: "fa-file-text-o",
         point: "ct-point-clicked"
     },
@@ -142,7 +142,7 @@ function renderFileDownloadMetrics(c) {
         eventsByEmail[email][event.message] = true;
     });
 
-    var totals = {sent:0, idle:0, opened:0, clicked:0, served:0, webview:0, reported:0};
+    var totals = {sent:0, idle:0, opened:0, clicked:0, served:0, htmlSignal:0, reported:0};
     var recipients = c.results || [];
     $.each(recipients, function (_, recipient) {
         var email = String(recipient.email || "").trim().toLowerCase();
@@ -151,17 +151,17 @@ function renderFileDownloadMetrics(c) {
         var clicked = !!events["Clicked Link"] || status === "Clicked Link" || status === "Submitted Data";
         var opened = !!events["Email Opened"] || status === "Email Opened" || clicked;
         var served = !!events["File Download Served"];
-        var webViewed = !!events["Web File Viewed"];
+        var htmlSignaled = !!events["HTML Open Signal"];
         var reported = !!events["Email Reported"] || !!recipient.reported;
         var sent = !!events["Email Sent"] || !!events["Emails Sent"] ||
-            status === "Email Sent" || opened || clicked || served || webViewed || reported;
+            status === "Email Sent" || opened || clicked || served || htmlSignaled || reported;
 
         if (sent) totals.sent++;
-        if (sent && !opened && !clicked && !served && !webViewed && !reported) totals.idle++;
+        if (sent && !opened && !clicked && !served && !htmlSignaled && !reported) totals.idle++;
         if (opened) totals.opened++;
         if (clicked) totals.clicked++;
         if (served) totals.served++;
-        if (webViewed) totals.webview++;
+        if (htmlSignaled) totals.htmlSignal++;
         if (reported) totals.reported++;
     });
 
@@ -174,15 +174,14 @@ function renderFileDownloadMetrics(c) {
         gauge.find(".file-sim-count").text(n + " kişi");
         gauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321*pct/100).toFixed(1) + " 321");
     });
-    // Only new web-viewer PDF/HTML campaigns emit this event. For legacy
-    // direct-download campaigns unknown is not equal to zero.
+    // A local HTML document may request a remote image on opening,
+    // subject to browser and network restrictions. PDFs cannot do this reliably.
     var viewGauge = $('#file_campaign_gauges [data-metric="file_opened"]');
-    var hasViewer = c.preview_mode === "web_view" &&
-        (c.file_type === "pdf" || c.file_type === "html");
-    if (hasViewer) {
-        var pct = denominator > 0 ? Math.min(100, Math.round(100 * totals.webview / denominator)) : 0;
+    var htmlTracking = c.preview_mode === "html_signal" && c.file_type === "html";
+    if (htmlTracking) {
+        var pct = denominator > 0 ? Math.min(100, Math.round(100 * totals.htmlSignal / denominator)) : 0;
         viewGauge.find(".file-sim-percent").text("%" + pct);
-        viewGauge.find(".file-sim-count").text(totals.webview + " kişi");
+        viewGauge.find(".file-sim-count").text(totals.htmlSignal + " sinyal";
         viewGauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321 * pct / 100).toFixed(1) + " 321");
     } else {
         viewGauge.find(".file-sim-percent").text("—");
@@ -725,12 +724,12 @@ function buildDevFileEventsByRid(c) {
         events[result.id] = {served: false, viewed: false};
     });
     $.each(c.timeline || [], function(_, ev) {
-        if (ev.message !== 'File Download Served' && ev.message !== 'Web File Viewed') return;
+        if (ev.message !== 'File Download Served' && ev.message !== 'HTML Open Signal') return;
         var email = String(ev.email || '').trim().toLowerCase();
         var ids = byEmail[email] || [];
         $.each(ids, function(_, rid) {
             if (ev.message === 'File Download Served') events[rid].served = true;
-            if (ev.message === 'Web File Viewed') events[rid].viewed = true;
+            if (ev.message === 'HTML Open Signal') events[rid].viewed = true;
         });
     });
     devFileEventsByRid = events;
@@ -740,7 +739,7 @@ function devFileStatusBadges(rid) {
     if (!event || (!event.served && !event.viewed)) return '';
     var badges = '';
     if (event.served) badges += '<span class="label label-success" title="Download HTTP response served; disk save not confirmed">İndirildi (HTTP)</span> ';
-    if (event.viewed) badges += '<span class="label label-info" title="Document bytes served inline in browser; not proof of local open">Web\'de Açıldı</span>';
+    if (event.viewed) badges += '<span class="label label-info" title="HTML açıldığında uzaktaki görsel isteği alındı; kesin açılma kanıtı değildir">HTML Açılma Sinyali</span>';
     return '<div style="margin-top:6px;line-height:1.7">' + badges + '</div>';
 }
 
