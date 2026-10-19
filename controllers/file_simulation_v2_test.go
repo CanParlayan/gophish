@@ -67,33 +67,42 @@ func TestFileSimulationV2PreviewInput(t *testing.T) {
 	}
 }
 
-func TestWebDocumentViewerLinksAndNoPixel(t *testing.T) {
-	for _, kind := range []string{"pdf", "html"} {
-		c := models.Campaign{ScenarioType: "file_download", FileType: kind,
-			FileName: "ornek." + kind, PreviewMode: "web_view"}
-		rs := models.Result{RId: "AbC1234"}
-		w := httptest.NewRecorder()
-		(&PhishingServer{}).webDocumentViewer(w, rs, c)
-		if w.Code != 200 {
-			t.Fatalf("viewer %s returned %d", kind, w.Code)
-		}
-		body := w.Body.String()
-		if !strings.Contains(body, `src="/download-report?rid=AbC1234&amp;inline=1"`) ||
-			!strings.Contains(body, `href="/download-report?rid=AbC1234"`) {
-			t.Errorf("%s viewer inline or attachment URL missing", kind)
-		}
-		if strings.Contains(body, "file-open-signal") || strings.Contains(body, "tracker.sympanion.com") {
-			t.Errorf("%s viewer must not contain remote tracking pixels", kind)
-		}
-		if !strings.Contains(w.Header().Get("Content-Security-Policy"), "frame-src 'self'") {
-			t.Errorf("%s viewer does not allow a same-origin document iframe", kind)
-		}
+func TestBlankPDFMatchesReferencePage(t *testing.T) {
+	pdf := buildBlankSimulationPDF()
+	if !bytes.HasPrefix(pdf, []byte("%PDF-1.4")) ||
+		!bytes.Contains(pdf, []byte("startxref")) ||
+		!bytes.Contains(pdf, []byte("%%EOF")) ||
+		!bytes.Contains(pdf, []byte("/MediaBox [0 0 612 792]")) ||
+		!bytes.Contains(pdf, []byte("/Length 0")) {
+		t.Fatal("blank PDF is not a valid single Letter page")
 	}
-	legacy := models.Campaign{ScenarioType: "file_download", FileType: "pdf",
-		FileName: "ornek.pdf", PreviewMode: "standard"}
+	if bytes.Contains(pdf, []byte("Authorized security awareness simulation")) {
+		t.Fatal("blank PDF must not include the legacy visible training text")
+	}
+}
+
+func TestHTMLDocumentSignalURL(t *testing.T) {
+	c := models.Campaign{URL: "https://portal.sympanion.com/old/path?bad=1#fragment"}
+	got, err := htmlOpenSignalURL(c, "AbC1234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://portal.sympanion.com/dev-file-landing?document_open=1&rid=AbC1234"
+	if got != want {
+		t.Errorf("signal URL = %q, want %q", got, want)
+	}
+	c.URL = "http://portal.sympanion.com"
+	if _, err := htmlOpenSignalURL(c, "AbC1234"); err == nil {
+		t.Fatal("HTML open tracking must require HTTPS")
+	}
+}
+
+func TestHTMLSignalRejectsOtherFormats(t *testing.T) {
+	c := models.Campaign{ScenarioType: "file_download", FileType: "pdf", PreviewMode: "pdf_blank"}
 	w := httptest.NewRecorder()
-	(&PhishingServer{}).webDocumentViewer(w, models.Result{RId: "AbC1234"}, legacy)
+	r := httptest.NewRequest("GET", "/dev-file-landing?rid=AbC1234&document_open=1", nil)
+	(&PhishingServer{}).ServeHTMLDocumentOpenSignal(w, r, models.Result{}, c)
 	if w.Code != 404 {
-		t.Fatalf("legacy campaign unexpectedly served web viewer: %d", w.Code)
+		t.Fatalf("PDF must not trigger an HTML open event: %d", w.Code)
 	}
 }
