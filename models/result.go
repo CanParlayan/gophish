@@ -146,6 +146,17 @@ func (r *Result) HandleFileDownloadServed(fileType string) error {
 	}, r.CampaignId)
 }
 
+// HandleWebDocumentViewed records a successful inline HTTP document response.
+// This is evidence of web viewer content being served, never proof that a
+// locally downloaded file was opened or read by a human.
+func (r *Result) HandleWebDocumentViewed(fileType string) error {
+	return AddEvent(&Event{
+		Email:   r.Email,
+		Message: "Web File Viewed",
+		Details: fmt.Sprintf(`{"file_type":%q,"meaning":"inline_http_response"}`, fileType),
+	}, r.CampaignId)
+}
+
 // HandleEmailReport updates a Result in the case where they report a simulated
 // phishing email using the HTTP handler.
 func (r *Result) HandleEmailReport(details EventDetails) error {
