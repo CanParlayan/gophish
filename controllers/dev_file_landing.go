@@ -18,6 +18,12 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 		http.NotFound(w, r)
 		return
 	}
+	// The same externally proxied path handles a remote image request made
+	// only by the downloaded HTML file. It must never count as a link click.
+	if r.URL.Query().Get("document_open") == "1" {
+		ps.ServeHTMLDocumentOpenSignal(w, r, rs, c)
+		return
+	}
 	// Reuse the already proxied /dev-file-landing route; no Apache change.
 	if r.URL.Query().Get("preview") == "1" {
 		ps.FilePreviewHandler(w, r)
