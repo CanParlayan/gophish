@@ -181,7 +181,7 @@ function renderFileDownloadMetrics(c) {
     if (htmlTracking) {
         var pct = denominator > 0 ? Math.min(100, Math.round(100 * totals.htmlSignal / denominator)) : 0;
         viewGauge.find(".file-sim-percent").text("%" + pct);
-        viewGauge.find(".file-sim-count").text(totals.htmlSignal + " sinyal";
+        viewGauge.find(".file-sim-count").text(totals.htmlSignal + " sinyal");
         viewGauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321 * pct / 100).toFixed(1) + " 321");
     } else {
         viewGauge.find(".file-sim-percent").text("—");
