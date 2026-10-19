@@ -47,7 +47,8 @@ function launch() {
                     scenario_type: $("#scenario_type").val() || "standard",
                     file_type: "", // Server derives the safe format from file_name.
                     file_name: $("#scenario_file_name").val().trim(),
-                    preview_mode: "standard",
+                    preview_mode: $("#scenario_type").val() === "file_download" &&
+                        /\.(pdf|html)$/i.test($("#scenario_file_name").val().trim()) ? "web_view" : "standard",
                     template: {
                         name: $("#template").select2("data")[0].text
                     },
