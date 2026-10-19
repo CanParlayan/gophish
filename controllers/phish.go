@@ -158,7 +158,7 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 	// Inline responses exist only for new PDF web-viewer campaigns.
 	// Direct downloads retain their existing attachment behavior.
 	webInline := r.URL.Query().Get("inline") == "1" && c.PreviewMode == "web_view" && c.FileType == "pdf"
-	if r.URL.Query().Has("inline") && !webInline {
+	if r.URL.Query().Get("inline") != "" && !webInline {
 		http.NotFound(w, r)
 		return
 	}
