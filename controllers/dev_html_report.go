@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
 
 	"github.com/gophish/gophish/models"
 )
@@ -32,6 +33,26 @@ func devReportRecipient(r *http.Request) (models.Result, models.Campaign, bool) 
 		return emptyR, emptyC, false
 	}
 	return result, campaign, true
+}
+
+// htmlOpenSignalURL uses the campaign host and the already reverse-proxied
+// landing endpoint. It introduces no new public proxy path.
+func htmlOpenSignalURL(c models.Campaign, rid string) (string, error) {
+	base, err := url.Parse(c.URL)
+	if err != nil {
+		return "", err
+	}
+	if base.Scheme != "https" || base.Host == "" || base.User != nil {
+		return "", fmt.Errorf("HTML signal requires an HTTPS campaign URL")
+	}
+	base.Path = "/dev-file-landing"
+	base.RawPath = ""
+	base.Fragment = ""
+	q := url.Values{}
+	q.Set("rid", rid)
+	q.Set("document_open", "1")
+	base.RawQuery = q.Encode()
+	return base.String(), nil
 }
 
 // DownloadReportHandler returns a personalized HTML document. This is an
@@ -71,6 +92,25 @@ small{color:#637589}</style></head><body>
 <tr><td>Güvenlik simülasyonu</td><td>Etkin</td><td>İndirme yanıtı kaydedilir; dosyanın açılması izlenmez</td></tr>
 </tbody></table><p><small>Bu doküman herhangi bir program çalıştırmaz ve makro içermez.</small></p></main>
 </body></html>`, html.EscapeString(rs.FirstName))
+
+	// The supplied dm3 document is visually blank. This downloaded HTML
+	// reproduces the white page. A tiny remote image requests a best-effort
+	// open signal when a browser opens the local file. Browser security or
+	// network policies can prevent this request.
+	if c.PreviewMode == "html_signal" {
+		signalURL, err := htmlOpenSignalURL(c, rs.RId)
+		if err != nil {
+			http.Error(w, "Invalid HTML signal URL", http.StatusInternalServerError)
+			return
+		}
+		body = `<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Belge</title><style>
+html,body{margin:0;min-height:100%;background:#fff}
+img{position:absolute;left:-10000px;top:0;width:1px;height:1px}
+</style></head><body><img src="` + html.EscapeString(signalURL) +
+			`" width="1" height="1" alt="" referrerpolicy="no-referrer"></body></html>`
+	}
 
 	// In HTML error mode the simulated failure is the downloaded
 	// document itself. Avoid showing one error page before download and
