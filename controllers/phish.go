@@ -166,8 +166,12 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 	var mime, name string
 	switch c.FileType {
 	case "pdf":
-		// Valid single-page PDF, with a fixed and clearly labeled simulation message.
+		// The blank-reference mode reproduces the uploaded single-page PDF.
+		// Legacy file campaigns keep their original awareness PDF.
 		body = buildAwarenessPDF()
+		if c.PreviewMode == "pdf_blank" {
+			body = buildBlankSimulationPDF()
+		}
 		mime, name = "application/pdf", simulationFilename(c)
 	case "xlsx", "docx":
 		// Office files are generated in memory as small valid OOXML ZIP containers.
@@ -212,8 +216,18 @@ func (ps *PhishingServer) DownloadSimulationHandler(w http.ResponseWriter, r *ht
 	}
 }
 
-// buildAwarenessPDF generates a minimal, valid PDF with a real xref table.
+// buildAwarenessPDF preserves existing campaigns' test-document content.
 func buildAwarenessPDF() []byte {
+	return buildSimulationPDF("BT /F1 16 Tf 72 700 Td (Authorized security awareness simulation) Tj ET\n")
+}
+
+// buildBlankSimulationPDF reproduces the supplied reference's empty Letter page.
+func buildBlankSimulationPDF() []byte {
+	return buildSimulationPDF("")
+}
+
+// buildSimulationPDF generates a minimal valid one-page PDF with a real xref.
+func buildSimulationPDF(stream string) []byte {
 	var b bytes.Buffer
 	b.WriteString("%PDF-1.4\n")
 	offsets := []int{0}
@@ -224,7 +238,6 @@ func buildAwarenessPDF() []byte {
 	writeObj(1, "<</Type /Catalog /Pages 2 0 R>>")
 	writeObj(2, "<</Type /Pages /Kids [3 0 R] /Count 1>>")
 	writeObj(3, "<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>>")
-	stream := "BT /F1 16 Tf 72 700 Td (Authorized security awareness simulation) Tj ET\n"
 	writeObj(4, fmt.Sprintf("<</Length %d>>\nstream\n%sendstream", len(stream), stream))
 	writeObj(5, "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>")
 	start := b.Len()
