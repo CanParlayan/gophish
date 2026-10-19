@@ -48,6 +48,13 @@ func (ps *PhishingServer) DownloadReportHandler(w http.ResponseWriter, r *http.R
 		ps.DownloadSimulationHandler(w, r)
 		return
 	}
+	// The inline response is requested by our web viewer's iframe only.
+	// Old campaigns and attachment downloads keep their existing behavior.
+	webInline := r.URL.Query().Get("inline") == "1" && c.PreviewMode == "web_view"
+	if r.URL.Query().Has("inline") && !webInline {
+		http.NotFound(w, r)
+		return
+	}
 	// Self-contained HTML: no tracking pixels or remote document resources.
 	body := fmt.Sprintf(`<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -86,10 +93,19 @@ small{display:block;color:#7b8797;margin-top:42px}
 	w.Header().Set("Cache-Control", "no-store, max-age=0")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, simulationFilename(c)))
+	disposition := "attachment"
+	if webInline {
+		disposition = "inline"
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`%s; filename=%q`, disposition, simulationFilename(c)))
 	if _, err := w.Write([]byte(body)); err != nil {
 		return
 	}
-	detail, _ := json.Marshal(map[string]string{"format": "html", "action": "http-response-served"})
-	_ = models.AddEvent(&models.Event{Email: rs.Email, Message: "File Download Served", Details: string(detail)}, rs.CampaignId)
+	if webInline {
+		_ = rs.HandleWebDocumentViewed("html")
+	} else {
+		detail, _ := json.Marshal(map[string]string{"format": "html", "action": "http-response-served"})
+		_ = models.AddEvent(&models.Event{Email: rs.Email, Message: "File Download Served", Details: string(detail)}, rs.CampaignId)
+	}
 }
