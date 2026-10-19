@@ -188,12 +188,9 @@ func (c *Campaign) Validate() error {
 			c.PreviewMode = "standard"
 		}
 		switch c.PreviewMode {
-		case "standard", "error", "download_preview", "web_view", "html_signal", "pdf_blank":
+		case "standard", "error", "download_preview", "html_signal", "pdf_blank":
 		default:
 			return errors.New("invalid preview_mode")
-		}
-		if c.PreviewMode == "web_view" && c.FileType != "pdf" && c.FileType != "html" {
-			return errors.New("web viewer is only available for PDF and HTML")
 		}
 		if c.PreviewMode == "html_signal" && c.FileType != "html" {
 			return errors.New("html open signal requires an HTML file")
