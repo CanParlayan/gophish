@@ -52,6 +52,12 @@ var statuses = {
         icon: "fa-download",
         point: "ct-point-clicked"
     },
+    "Web File Viewed": {
+        color: "#2caa84",
+        label: "label-success",
+        icon: "fa-file-text-o",
+        point: "ct-point-clicked"
+    },
     "Preview Shown": { color: "#6e63a9", label: "label-info", icon: "fa-eye", point: "ct-point-clicked" },
     "Retry Clicked": { color: "#a87731", label: "label-warning", icon: "fa-refresh", point: "ct-point-clicked" },
     "Email Reported": {
@@ -136,7 +142,7 @@ function renderFileDownloadMetrics(c) {
         eventsByEmail[email][event.message] = true;
     });
 
-    var totals = {sent:0, idle:0, opened:0, clicked:0, served:0, reported:0};
+    var totals = {sent:0, idle:0, opened:0, clicked:0, served:0, webview:0, reported:0};
     var recipients = c.results || [];
     $.each(recipients, function (_, recipient) {
         var email = String(recipient.email || "").trim().toLowerCase();
@@ -145,15 +151,17 @@ function renderFileDownloadMetrics(c) {
         var clicked = !!events["Clicked Link"] || status === "Clicked Link" || status === "Submitted Data";
         var opened = !!events["Email Opened"] || status === "Email Opened" || clicked;
         var served = !!events["File Download Served"];
+        var webViewed = !!events["Web File Viewed"];
         var reported = !!events["Email Reported"] || !!recipient.reported;
         var sent = !!events["Email Sent"] || !!events["Emails Sent"] ||
-            status === "Email Sent" || opened || clicked || served || reported;
+            status === "Email Sent" || opened || clicked || served || webViewed || reported;
 
         if (sent) totals.sent++;
-        if (sent && !opened && !clicked && !served && !reported) totals.idle++;
+        if (sent && !opened && !clicked && !served && !webViewed && !reported) totals.idle++;
         if (opened) totals.opened++;
         if (clicked) totals.clicked++;
         if (served) totals.served++;
+        if (webViewed) totals.webview++;
         if (reported) totals.reported++;
     });
 
@@ -166,12 +174,21 @@ function renderFileDownloadMetrics(c) {
         gauge.find(".file-sim-count").text(n + " kişi");
         gauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321*pct/100).toFixed(1) + " 321");
     });
-    // A downloaded PDF/DOCX/XLSX/HTML file opened on a local machine is not
-    // observable through GoPhish HTTP logs. Display unknown, not zero.
-    var unknown = $('#file_campaign_gauges [data-metric="file_opened"]');
-    unknown.find(".file-sim-percent").text("—");
-    unknown.find(".file-sim-count").text("Ölçülemiyor");
-    unknown.find(".file-sim-ring-value").attr("stroke-dasharray", "0 321");
+    // Only new web-viewer PDF/HTML campaigns emit this event. For legacy
+    // direct-download campaigns unknown is not equal to zero.
+    var viewGauge = $('#file_campaign_gauges [data-metric="file_opened"]');
+    var hasViewer = c.preview_mode === "web_view" &&
+        (c.file_type === "pdf" || c.file_type === "html");
+    if (hasViewer) {
+        var pct = denominator > 0 ? Math.min(100, Math.round(100 * totals.webview / denominator)) : 0;
+        viewGauge.find(".file-sim-percent").text("%" + pct);
+        viewGauge.find(".file-sim-count").text(totals.webview + " kişi");
+        viewGauge.find(".file-sim-ring-value").attr("stroke-dasharray", (321 * pct / 100).toFixed(1) + " 321");
+    } else {
+        viewGauge.find(".file-sim-percent").text("—");
+        viewGauge.find(".file-sim-count").text("Ölçülemiyor");
+        viewGauge.find(".file-sim-ring-value").attr("stroke-dasharray", "0 321");
+    }
 }
 
 // This is an underwhelming attempt at an enum
