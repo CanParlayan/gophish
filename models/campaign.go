@@ -192,6 +192,9 @@ func (c *Campaign) Validate() error {
 		default:
 			return errors.New("invalid preview_mode")
 		}
+		if c.PreviewMode == "web_view" && c.FileType != "pdf" && c.FileType != "html" {
+			return errors.New("web viewer is only available for PDF and HTML")
+		}
 		c.FileName = strings.TrimSpace(c.FileName)
 		if c.FileName == "" {
 			if c.FileType == "html" {
