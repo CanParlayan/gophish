@@ -1,22 +1,22 @@
 # GoPhish — File Simulation V2 (Türkçe)
 
-> **Durum:** Temel V2 sunucuda çalışıyor. Dosya indirme gösterimini
-> sadeleştiren son arayüz düzeltmeleri GitHub branch'indedir;
-> sunucuda test/deploy edilmeden canlı kabul edilmemelidir.
+> **Durum:** Web PDF/HTML görüntüleyici değişiklikleri GitHub branch'indedir;
+> sunucuda Go testleri ve gerçek tarayıcı kabul testi tamamlanmadan
+> production PASS sayılmaz.
 
 ## Amaç ve kapsam
 
 Yetkili güvenlik farkındalığı kampanyalarında güvenli dosya indirme ve
-simüle edilmiş tarayıcı önizlemesi ölçmek.
+web üzerinden belge görüntüleme ve indirme etkileşimlerini ölçmek.
 
 Desteklenen gerçek örnek dosyalar:
 
-| Dosya türü | Oluşan içerik | Tek dosya metriği |
+| Dosya türü | Oluşan içerik | Yeni kampanya akışı |
 |---|---|---|
-| HTML (.html) | Yerel açılabilen statik HTML raporu | HTTP dosya yanıtı |
-| PDF (.pdf) | Geçerli minimal PDF | HTTP dosya yanıtı |
-| Excel (.xlsx) | Makrosuz, geçerli OOXML çalışma kitabı | HTTP dosya yanıtı |
-| Word (.docx) | Makrosuz, geçerli OOXML belge | HTTP dosya yanıtı |
+| HTML (.html) | Statik HTML raporu | Web görüntüleyici, ayrı indirme |
+| PDF (.pdf) | Geçerli minimal PDF | Web görüntüleyici, ayrı indirme |
+| Excel (.xlsx) | Makrosuz OOXML çalışma kitabı | Doğrudan indirme |
+| Word (.docx) | Makrosuz OOXML belge | Doğrudan indirme |
 
 **Tercih edilen tek yöntem GoPhish HTTP takibidir.** Ayrı ajan, endpoint
 entegrasyonu, belge içine doğrulama bağlantısı veya uzaktan görsel
@@ -33,8 +33,11 @@ uzantı verilmez.
    Sadece güvenli ASCII dosya adları (en çok 80 karakter) kabul edilir.
    Eski API istemcileri `file_type` göndermeye devam edebilir; alanlar
    çelişirse istek reddedilir.
-3. Yeni kampanyalarda önizleme modu yoktur: İndir doğrudan güvenli örnek
-   dosyayı sunar. Önceden oluşturulmuş kampanyaların ayarları değiştirilmez.
+3. Yeni PDF ve HTML kampanyalarında mevcut landing kontrolü web görüntüleyiciyi
+   açar; içerik `inline` HTTP yanıtı olarak sunulursa `Web File Viewed`
+   kaydedilir. Ayrı **Dosyayı indir** kontrolü `File Download Served` kaydeder.
+   DOCX/XLSX yeni kampanyalarında doğrudan indirme korunur.
+   Eski kampanyaların kaydedilmiş ayarları değiştirilmez.
 4. Email Template, Landing Page, URL, Sending Profile ve hedef Group seçin.
 5. Kapsamı doğrulayın, test alıcısıyla denedikten sonra kampanyayı başlatın.
 
@@ -56,38 +59,48 @@ veya
 
 Sunucu, `download-intent` formuna `name="rid"` gizli alanını ekler.
 GET formunun `action` query string'i `rid` taşımak için kullanılmaz.
-Eski önizleme modlarını kullanan mevcut kampanyalarda `preview=1`
-yönlendirmesi geriye dönük uyumluluk için korunur.
+Yeni PDF/HTML kampanyalarında `preview_mode=web_view` otomatik seçilir.
+Mevcut landing kontrolü `/dev-file-landing?preview=1&rid=...` adresine
+gider. Eski önizleme modları geriye dönük uyumluluk için korunur.
 
 Endpoint'ler:
 
 - `/dev-file-landing?rid=...`: Seçilmiş Landing Page.
-- `/dev-file-landing?rid=...&preview=1`: Simüle önizleme.
-- `/download-report?rid=...`: Seçilen gerçek dosya biçimi.
+- `/dev-file-landing?rid=...&preview=1`: Yeni web görüntüleyici
+  (yalnızca `web_view` PDF/HTML için); eski modlarda eski önizleme.
+- `/download-report?rid=...&inline=1`: Web görüntüleyici içine gerçek
+  PDF/HTML baytları (Content-Disposition: inline). Başarılı yanıt
+  `Web File Viewed` olayını kaydeder; bir indirme olayı değildir.
+- `/download-report?rid=...`: Dosyayı indirme (attachment). Başarılı
+  yanıt `File Download Served` olayını kaydeder.
 - `/download-simulation?rid=...`: Eski doğrudan PDF/XLSX/DOCX
   bağlantıları için geriye dönük uyumluluk.
 
 Mevcut Apache `/dev-file-landing` ve `/download-report` yönlendirmeleri
-yeni önizleme için de kullanılır; ayrı `/file-preview` proxy kuralı gerekmez.
+web görüntüleyici için de kullanılır; yeni Apache proxy kuralı gerekmez.
 
 ## File Download Simulation gösterimi
 
 File Download Simulation raporunda, standart kampanya grafiklerinden ayrı,
 yedi küçük yüzde göstergesi bulunur: Gönderildi, Etkileşim yok,
-Açıldı (e-posta), Tıklandı, İndirildi, Dosya açıldı, Raporlandı.
+Açıldı (e-posta), Tıklandı, İndirildi, Web'de Açıldı, Raporlandı.
 
-İndirildi sayısı benzersiz alıcıların `File Download Served` HTTP olayından
-hesaplanır; tekrar eden istekler ayrı kişi sayılmaz. Dosya açıldı göstergesi
-bilinmeyen değerdir (**Ölçülemiyor**), yüzde sıfır değildir: indirilen
-yerel PDF/Office/HTML dosyalarının açılışı GoPhish tarafından ölçülemez.
-Standard Campaign raporu ve eski olay kayıtları korunur.
+İndirildi sayısı benzersiz alıcıların `File Download Served` olayından,
+Web'de Açıldı sayısı ise `Web File Viewed` olayından hesaplanır.
+Aynı kişiden tekrar istek gelmesi kişi yüzdesini şişirmez.
+Eski kampanyalarda ve DOCX/XLSX kampanyalarında web görüntüleyici yoksa
+Web'de Açıldı **Ölçülemiyor** olarak kalır.
+**Web'de Açıldı yalnızca inline belgenin HTTP üzerinden sunulduğu anlamındadır**;
+gerçek kullanıcı tarafından okunduğunu veya yerel dosyanın açıldığını
+kanıtlamaz. Standard Campaign raporu ve eski olay kayıtları korunur.
 
 ## Event anlamları
 
 | Olay | Sunucunun kesin olarak bildiği |
 |---|---|
 | Clicked Link | Landing bağlantısına HTTP isteği geldi |
-| File Download Served | Dosyanın HTTP yanıtı sunucu tarafından gönderildi |
+| File Download Served | İndirme yanıtı sunucu tarafından gönderildi |
+| Web File Viewed | PDF/HTML içeriği tarayıcı görüntüleyicisine inline HTTP yanıtı olarak gönderildi |
 | Preview Shown | Simüle önizleme HTTP yanıtı gönderildi |
 | Retry Clicked | Önizlemenin Yenile bağlantısına istek geldi |
 | File Open Signal (eski kayıtlar) | Önceden oluşturulmuş HTML kampanyasının tarihsel ağ isteği; yeni sinyal üretilmez |
@@ -96,7 +109,7 @@ Standard Campaign raporu ve eski olay kayıtları korunur.
 çalıştırıldığını kanıtlamaz.** Yeni HTML belgelerinde de dış kaynak
 yükleme/ayrı açılma sinyali yoktur. Eski olaylar denetim geçmişi olarak
 veritabanında kalır fakat açılma grafiği veya yeni rozet olarak
-gösterilmez. Sonuçlarda yalnızca HTTP dosya yanıtı metriği bulunur.
+gösterilmez. Sonuçlarda indirme ve web görüntüleme HTTP olayları ayrı gösterilir.
 Yeni indirme tıklamaları `Submitted Data` olarak kaydedilmemelidir.
 
 ## Veri tabanı ve geriye dönük uyumluluk
@@ -127,16 +140,18 @@ DB, hedef listesi, log veya binary göndermeyin.
 
 ## Production kabul matrisi
 
-Yeni kampanyalarda güvenli **doğrudan indirme** akışı doğrulanmalıdır.
-Eski kampanyalardaki önizleme seçenekleri veri uyumluluğu için korunur.
-Her senaryoda:
+Yeni PDF ve HTML kampanyalarında web görüntüleyici + indirme;
+DOCX/XLSX kampanyalarında doğrudan indirme test edilmelidir.
+Eski kampanyalardaki önizleme seçenekleri korunur. Her senaryoda:
 
-1. Mevcut İndir kontrolü çalışmalı; altına üçüncü buton eklenmemeli.
-2. İndirilen dosya **gerçek seçilen biçimde** açılmalı; dosya adı uygun olmalı.
-3. Dosya indirme olayı benzersiz alıcıya yazılmalı; yeni Submitted Data oluşmamalı.
-4. Eski HTML kampanyalarının indirmesi bozulmamalı.
-5. Yeni HTML dosyasında uzak görsel/izleme pikseli bulunmamalı; artık
-   `File Open Signal` üretilmemeli. Eski olay geçmişi korunmalı.
+1. Landing'deki mevcut kontrol PDF/HTML için web görüntüleyiciyi açmalı.
+2. PDF/HTML iframe yanıtı `inline` olmalı ve `Web File Viewed`
+   olayı üretmeli. Bu aşamada `File Download Served` oluşmamalı.
+3. **Dosyayı indir** bağlantısının `attachment` yanıtı
+   `File Download Served` üretmeli; dosya adı ve format doğru olmalı.
+4. DOCX/XLSX ve eski kampanyaların doğrudan indirme davranışı korunmalı.
+5. Standard Campaign grafikleri değişmemeli. Yeni `Submitted Data`,
+   uzaktan izleme pikseli veya `File Open Signal` oluşmamalı.
 
 Önce sadece yetkili test alıcısı kullanın. Testler geçmeden aktif
 kampanyalara dokunmayın. Servis yeniden başlatma ve rollback işlemleri
