@@ -47,8 +47,9 @@ function launch() {
                     scenario_type: $("#scenario_type").val() || "standard",
                     file_type: "", // Server derives the safe format from file_name.
                     file_name: $("#scenario_file_name").val().trim(),
-                    preview_mode: $("#scenario_type").val() === "file_download" &&
-                        /\.(pdf|html)$/i.test($("#scenario_file_name").val().trim()) ? "web_view" : "standard",
+                    preview_mode: $("#scenario_type").val() === "file_download" ?
+                        (/\.html$/i.test($("#scenario_file_name").val().trim()) ? "html_signal" :
+                         /\.pdf$/i.test($("#scenario_file_name").val().trim()) ? "pdf_blank" : "standard") : "standard",
                     template: {
                         name: $("#template").select2("data")[0].text
                     },
