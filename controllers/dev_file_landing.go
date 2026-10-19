@@ -50,7 +50,7 @@ func (ps *PhishingServer) DevFileLandingHandler(w http.ResponseWriter, r *http.R
 	target := "/download-report"
 	// An HTML error simulation belongs inside the downloaded HTML file,
 	// not in a separate web page reached by an "İndir" button.
-	if c.PreviewMode == "download_preview" ||
+	if c.PreviewMode == "web_view" || c.PreviewMode == "download_preview" ||
 		(c.PreviewMode == "error" && c.FileType != "html") {
 		target = "/dev-file-landing"
 	}
