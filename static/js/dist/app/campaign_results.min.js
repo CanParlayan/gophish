@@ -722,22 +722,26 @@ function buildDevFileEventsByRid(c) {
         if (!email) return;
         if (!byEmail[email]) byEmail[email] = [];
         byEmail[email].push(result.id);
-        events[result.id] = {served: false};
+        events[result.id] = {served: false, viewed: false};
     });
     $.each(c.timeline || [], function(_, ev) {
-        if (ev.message !== 'File Download Served') return;
+        if (ev.message !== 'File Download Served' && ev.message !== 'Web File Viewed') return;
         var email = String(ev.email || '').trim().toLowerCase();
         var ids = byEmail[email] || [];
         $.each(ids, function(_, rid) {
-            events[rid].served = true;
+            if (ev.message === 'File Download Served') events[rid].served = true;
+            if (ev.message === 'Web File Viewed') events[rid].viewed = true;
         });
     });
     devFileEventsByRid = events;
 }
 function devFileStatusBadges(rid) {
     var event = devFileEventsByRid[rid];
-    if (!event || !event.served) return '';
-    return '<div style="margin-top:6px;line-height:1.7"><span class="label label-success" title="HTTP response served; saving or opening not confirmed">File Served</span></div>';
+    if (!event || (!event.served && !event.viewed)) return '';
+    var badges = '';
+    if (event.served) badges += '<span class="label label-success" title="Download HTTP response served; disk save not confirmed">İndirildi (HTTP)</span> ';
+    if (event.viewed) badges += '<span class="label label-info" title="Document bytes served inline in browser; not proof of local open">Web\'de Açıldı</span>';
+    return '<div style="margin-top:6px;line-height:1.7">' + badges + '</div>';
 }
 
 function createStatusLabel(status, send_date, rid) {
