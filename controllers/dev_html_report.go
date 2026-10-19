@@ -51,7 +51,7 @@ func (ps *PhishingServer) DownloadReportHandler(w http.ResponseWriter, r *http.R
 	// The inline response is requested by our web viewer's iframe only.
 	// Old campaigns and attachment downloads keep their existing behavior.
 	webInline := r.URL.Query().Get("inline") == "1" && c.PreviewMode == "web_view"
-	if r.URL.Query().Has("inline") && !webInline {
+	if r.URL.Query().Get("inline") != "" && !webInline {
 		http.NotFound(w, r)
 		return
 	}
