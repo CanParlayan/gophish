@@ -45,10 +45,6 @@ func (ps *PhishingServer) FilePreviewHandler(w http.ResponseWriter, r *http.Requ
 		http.NotFound(w, r)
 		return
 	}
-	if c.PreviewMode == "web_view" {
-		ps.webDocumentViewer(w, rs, c)
-		return
-	}
 	if c.PreviewMode == "" || c.PreviewMode == "standard" {
 		http.Redirect(w, r, "/download-report?rid="+url.QueryEscape(rs.RId), http.StatusSeeOther)
 		return
