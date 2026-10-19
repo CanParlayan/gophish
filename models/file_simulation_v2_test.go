@@ -32,11 +32,19 @@ func TestFileSimulationV2Validation(t *testing.T) {
 			t.Errorf("%s is not valid: %v", kind, err)
 		}
 	}
-	for _, mode := range []string{"standard", "error", "download_preview"} {
+	for _, mode := range []string{"standard", "error", "download_preview", "web_view"} {
 		c := validSimulationCampaign()
 		c.PreviewMode = mode
 		if err := c.Validate(); err != nil {
 			t.Errorf("mode %q: %v", mode, err)
+		}
+	}
+	for _, kind := range []string{"xlsx", "docx"} {
+		c := validSimulationCampaign()
+		c.FileType = kind
+		c.PreviewMode = "web_view"
+		if err := c.Validate(); err == nil {
+			t.Errorf("web viewer wrongly allowed for %s", kind)
 		}
 	}
 	for _, name := range []string{"../report.pdf", "report.xlsx", "report.pdf\r\nHeader: x", ".pdf", strings.Repeat("a", 90)+".pdf"} {
